@@ -1,0 +1,7 @@
+https://en.wikipedia.org/wiki/B%C3%A9zier_curve
+https://he.wikipedia.org/wiki/SVG
+http://stackoverflow.com/questions/30711203/how-do-i-create-a-teardrop-in-html/30711437
+http://stackoverflow.com/questions/785097/how-do-i-implement-a-b%C3%A9zier-curve-in-c
+
+http://picsvg.com/
+https://svg-edit.github.io/svgedit/releases/svg-edit-2.8.1/svg-editor.html
