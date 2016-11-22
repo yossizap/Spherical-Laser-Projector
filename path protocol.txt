@@ -1,4 +1,4 @@
-Spherical Laser Projector Path Protocol:
+Spherical Laser Projector Path Protocol 1.0:
 
 Represents a path using binary graphic command(s).
 Each command is 8 bits, follow by little-endian 16 bits arguments.
@@ -7,25 +7,37 @@ Each command is 8 bits, follow by little-endian 16 bits arguments.
 * commands for regular polygon, ellipse are not supported yet
 
 command bits:
-[7 6 5 4 3 2 1 0]
-0-3						= command id
-4						= <reserved>
-5						= is last command (0 if more commands are follow, 1 otherwise)
-6-7						= laser mode
+	[7 6 5 4 3 2 1 0]
+	0-3						= command id
+	4						= <reserved>
+	5						= is last command (0 if more commands are follow, 1 otherwise)
+	6-7						= laser mode
 
 laser mode:
-0						= laser off during all command (for motors debug)
-1						= laser off befor command and on after reaching the first point
-2						= laser on befor command
-3						= use last position as first point argument (laser stays on)
+	0						= laser off during all command (for motors debug)
+	1						= laser off befor command and on after reaching the first point
+	2						= laser on befor command
+	3						= use last position as first point argument (laser stays on)
 
 command id:
-0	x0,y0,x1			= draw horizontal line from (x0,y0) to (x1,y0)
-1	x0,y0,y1			= draw vertical line from (x0,y0) to (x0,y1)
-2	x0,y0,x1,y1			= draw line from (x0,y0) to (x1,y1)
-3	x0,y0,x1,y1			= draw clockwise rect, (x0,y0) to (x1,y0) to (x1,y1) to (x0,y1) to (x0,y0)
-4	x0,y0,x1,y1			= draw counterclockwise rect, (x0,y0) to (x0,y1) to (x1,y1) to (x1,y0) to (x0,y0)
-5	x,y,c,r,a			= draw clockwise regular polygon, (x,y): center, c: corners, r: radius, a: start angle (c > 20 like circle)
-6	x,y,c,r,a			= draw counterclockwise regular polygon, (x,y): center, c: corners, r: radius, a: start angle (c > 20 like circle)
-7	x,y,r,a				= draw clockwise circle, (x,y): center, r: radius, a: start angle
-8	x,y,r,a				= draw counterclockwise circle, (x,y): center, r: radius, a: start angle
+	0	x0,y0,x1			= draw horizontal line from (x0,y0) to (x1,y0)
+	1	x0,y0,y1			= draw vertical line from (x0,y0) to (x0,y1)
+	2	x0,y0,x1,y1			= draw line from (x0,y0) to (x1,y1)
+	3	x0,y0,x1,y1			= draw clockwise rect, (x0,y0) to (x1,y0) to (x1,y1) to (x0,y1) to (x0,y0)
+	4	x0,y0,x1,y1			= draw counterclockwise rect, (x0,y0) to (x0,y1) to (x1,y1) to (x1,y0) to (x0,y0)
+	5	x,y,c,r,a			= draw clockwise regular polygon, (x,y): center, c: corners, r: radius, a: start angle (c > 20 like circle)
+	6	x,y,c,r,a			= draw counterclockwise regular polygon, (x,y): center, c: corners, r: radius, a: start angle (c > 20 like circle)
+	7	x,y,r,a				= draw clockwise circle, (x,y): center, r: radius, a: start angle
+	8	x,y,r,a				= draw counterclockwise circle, (x,y): center, r: radius, a: start angle
+	9	x0,y0,x1,y1,x2,y2	= draw bezier curve from (x0,y0) to (x2,y2)
+
+examples:
+	draw horizontal line from (4,8) to (6,8)
+	"\x60\x00\x04\x00\x08\x00\x06"
+
+	draw vertical line from (4,8) to (4,10)
+	"\x61\x00\x04\x00\x08\x00\x0A"
+
+	draw rect and 2 diagonal lines - house
+	(only one line command, the first line is made during movment to start point of line command)
+	"\x43\x00\x04\x00\x04\x00\x08\x00\x08\xC2\x00\x06\x00\x00\x00\x08\x00\x04\"
