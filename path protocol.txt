@@ -2,9 +2,7 @@ Spherical Laser Projector Path Protocol 1.0:
 
 Represents a path using binary graphic command(s).
 Each command is 8 bits, follow by little-endian 16 bits arguments.
-
-* all points are relativly to 0,0 at left top of path
-* commands for regular polygon, ellipse are not supported yet
+All points are relativly to 0,0 - left top of path.
 
 command bits:
 	[7 6 5 4 3 2 1 0]
@@ -30,6 +28,7 @@ command id:
 	7	x,y,r,a				= draw clockwise circle, (x,y): center, r: radius, a: start angle
 	8	x,y,r,a				= draw counterclockwise circle, (x,y): center, r: radius, a: start angle
 	9	x0,y0,x1,y1,x2,y2	= draw bezier curve from (x0,y0) to (x2,y2)
+	10-15					= <reserved>
 
 examples:
 	draw horizontal line from (4,8) to (6,8)
