@@ -27,7 +27,7 @@
 | By A.E.TEC (Arad Eizen) 2016.                                                |
 |	                                                                           |
 \******************************************************************************/
-#include "arial_font.h"
+// #include "arial_font.h"
 
 #define X_AXIS_LIMIT_MIN			(-200)
 #define Y_AXIS_LIMIT_MIN			(-100)
@@ -38,9 +38,7 @@
 #define SERIAL_BUFFER_SIZE			(60)
 
 #define STEPS_PER_RADIAN			(648.68)
-#define STEP_DELAY_MS				(20)
-#define LASER_POINTS_COUNT			(256)
-#define LASER_MASKS_COUNT			(LASER_POINTS_COUNT / 8)
+#define STEP_DELAY_MS				(4)
 
 #define X_AXIS_A_PIN				(4)
 #define X_AXIS_B_PIN				(5)
@@ -86,9 +84,9 @@ void step_to_current_position() {
 /* turn laser on or off (pull mosfet gate down to turn the laser on) */
 void set_laser(bool is_on) {
 	if (is_on)
-		DDRB &= ~LASER_MASK;
+		PORTB |= LASER_MASK;
 	else
-		DDRB |= LASER_MASK;
+		PORTB &= ~LASER_MASK;
 }
 
 /* go to the given axes position from current motors position */
@@ -101,7 +99,7 @@ void absolute_steps(xy_point * p) {
 void relative_steps(xy_point * p) {
 	int32_t steps, err, e;
 	xy_point delta = {abs(p->x), abs(p->y)};
-	xy_point step = {(p->x > 0 ? 1 : (p->x < 0 ? -1 : 0)), (p->y > 0 ? 1 : (p->y < 0 ? -1 : 0)};
+	xy_point step = {(p->x > 0 ? 1 : (p->x < 0 ? -1 : 0)), (p->y > 0 ? 1 : (p->y < 0 ? -1 : 0))};
 
 	steps = max(delta.x, delta.y);
 	err = (delta.x > delta.y ? delta.x : -delta.y) / 2;
@@ -130,7 +128,7 @@ void set_home() {
 /* turn laser off and put projector in home position */
 void go_home() {
 	xy_point p = {0, 0};
-	set_laser(0);
+	set_laser(false);
 	absolute_steps(&p);
 }
 
@@ -152,7 +150,7 @@ void draw_polygon(xy_point * p, uint8_t corners, int16_t size, int16_t start_ang
 	disable_axes();
 }
 
-void get_path_size(char * path, xy_point * p) {
+/*void get_path_size(char * path, xy_point * p) {
 	
 }
 
@@ -170,10 +168,10 @@ void get_text_size(char * text, xy_point * p) {
 
 void draw_path(char * path, xy_point * p) {
 	
-}
+}*/
 
 /* draw a NULL terminated string */
-void draw_text(char * text, xy_point * p) {
+/*void draw_text(char * text, xy_point * p) {
 	xy_point tmp;
 	
 	if (text_right_diraction) {
@@ -183,19 +181,20 @@ void draw_text(char * text, xy_point * p) {
 	draw_path
 	while (*text)
 		x += draw_char(x, y, *text++, scale) + 1;
-}
+}*/
 
 /* called once at power-on */
 void setup() {
 	Serial.begin(SERIAL_BAUDRATE);
 	DDRD |= 0xF0;				// (4 - 7) OUTPUTS
 	DDRC |= 0x0F;				// (A0 - A3) OUTPUTS
-	PORTB &= ~LASER_MASK;		// (8) LOW for laser outputs
-	set_laser(0);				// turn off laser
+	DDRB |= LASER_MASK;			// (8) OUTPUT
+	set_laser(false);			// turn off laser
 	set_home();
 }
 
 /* called repeatedly after "setup" */
-void loop() {	
-
+void loop() {
+	xy_point tmp = {0, 0};
+	draw_polygon(&tmp, 4, 100, 0);
 }
