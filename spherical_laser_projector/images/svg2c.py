@@ -129,9 +129,9 @@ def create_function_wrapper(func_name, func_content):
     indented_code = ''.join(indent+line for line in func_content.splitlines(True))
     wrapper = "extern void set_laser(bool is_on);\n"
     wrapper += "extern void draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1);\n"
-    wrapper += "extern void draw_quadratic_bezier(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);\n"
-    wrapper += "extern void draw_cubic_bezier(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3);\n"
-    wrapper += "void %s()\n{\n%s}" % (func_name, indented_code)
+    wrapper += "extern void draw_quadratic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2);\n"
+    wrapper += "extern void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3);\n\n"
+    wrapper += "void %s() {\n%s}\n" % (func_name, indented_code)
     return wrapper
 
 
