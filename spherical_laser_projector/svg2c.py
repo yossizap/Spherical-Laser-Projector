@@ -78,7 +78,10 @@ def generate_code(paths):
 
 
 def round_float(number):
-    return round(number * ROUNDING_MULTIPLIER)
+    '''
+    Rounds a float to an int and multiplies it with a constant to make up for the percision loss.
+    '''
+    return int(round(number * ROUNDING_MULTIPLIER))
 
 
 def create_function_call(func_name, arguments):
