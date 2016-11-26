@@ -11,10 +11,10 @@ SVG_XML_NAMESPACE = "http://www.w3.org/2000/svg"
 ROUNDING_MULTIPLIER = 1
 
 # C function names
-CUBIC_BEZIER_FUNC_NAME = "cubic_bezier"
-LINE_FUNC_NAME = "line"
-QUADRATIC_BEZIER_FUNC_NAME = "quadratic_bezier"
-ARC_FUNC_NAME = "arc"
+CUBIC_BEZIER_FUNC_NAME = "draw_cubic_bezier"
+LINE_FUNC_NAME = "draw_line"
+QUADRATIC_BEZIER_FUNC_NAME = "draw_quadratic_bezier"
+ARC_FUNC_NAME = "draw_arc"
 TURN_OFF_LASER_FUNC_NAME = "set_laser"
 
 
