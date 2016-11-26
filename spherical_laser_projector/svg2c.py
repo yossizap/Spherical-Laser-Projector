@@ -33,7 +33,7 @@ def generate_code(paths, close=True):
             instructions_counter += 1
             if 1 == instructions_counter:
                 start_x = instruction.start.real
-                start_y = instruction.start.real
+                start_y = instruction.start.imag
                 
             if isinstance(instruction, svg.path.QuadraticBezier):
                 gen_code += create_function_call(QUADRATIC_BEZIER_FUNC_NAME,
