@@ -1,12 +1,5 @@
-
-#define LOG_TIMING 0
-
-// How far can you zoom in? Don't make this too high or it becomes impossible to
-// navigate.
-static const double kMaxZoom = 8.0;
-
-// How far can you zoom out?
-static const double kMinZoom = 0.5;
+#define PRECOMPUTED
+#define ENCODE_FIXED(v) static_cast<int32_t>(v * fixed::kFactor)
 
 // How many points are we painting per segment of a curve?
 static const uint16_t kLogN = 4;
@@ -18,11 +11,7 @@ static const uint8_t kHeight = 128;
 static const uint8_t kLogHeight = 7;
 
 
-#define PRECOMPUTED
-
 template <typename T> class Point;
-
-#define ENCODE_FIXED(v) static_cast<int32_t>(v * fixed::kFactor)
 
 class fixed {
 public:
@@ -185,7 +174,6 @@ public:
 	void set_home();
 	void go_home();
 	const uint8_t STEPS_MASKS[8] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
-	// uint8_t STEPS_MASKS[8];
 
 	int16_t current_position_x;
 	int16_t current_position_y;
@@ -222,53 +210,68 @@ private:
 static Main main;
 
 void Main::setup() {
-	
-display().initialize();
-/*
-  static const double kMax = 1024.0;
-  static const double kHalf = kMax / 2.0;
+	display().initialize();
 
-  // Zoom
-  uint16_t raw_zoom = 200;
-  double zoom;
-  if (raw_zoom < kHalf) {
-    double ratio = raw_zoom / kHalf;
-    zoom = ratio + (1 - ratio) * kMaxZoom;
-  } else {
-    double ratio = (raw_zoom - kHalf) / kHalf;
-    zoom = ratio * kMinZoom + (1 - ratio);
-  }
-  
-  
-  // Pan
-  uint16_t raw_dx = 200;
-  double dx = ((raw_dx - kHalf) / kHalf) * kWidth;
-  uint16_t raw_dy = 200;
-  double dy = ((raw_dy - kHalf) / kHalf) * kHeight;
-
-  // Rotation
-  uint16_t rotation = 200;
-  double theta = 3.141592645 * (rotation - kHalf) / kHalf;
-
-  // Update the display.
-  display().update_transform(zoom, theta, dx, dy);
-*/
-	
-    // Drawing::draw_australia(display());
-    Drawing::draw_hand(display());
-    // Drawing::draw_arduino(display());
+	// Drawing::draw_australia(display());
+	Drawing::draw_hand(display());
+	// Drawing::draw_arduino(display());
 	display().go_home();
 }
+
+/*
+void Main::update_transform(double zoom, double theta, double dx, double dy) {
+	// How far can you zoom in? Don't make this too high or it becomes impossible to navigate.
+	static const double kMaxZoom = 8.0;
+	// How far can you zoom out?
+	static const double kMinZoom = 0.5;
+	static const double kMax = 1024.0;
+	static const double kHalf = kMax / 2.0;
+
+	// Zoom
+	uint16_t raw_zoom = 200;
+	double zoom;
+	if (raw_zoom < kHalf) {
+		double ratio = raw_zoom / kHalf;
+		zoom = ratio + (1 - ratio) * kMaxZoom;
+	}
+	else {
+		double ratio = (raw_zoom - kHalf) / kHalf;
+		zoom = ratio * kMinZoom + (1 - ratio);
+	}
+
+	// Pan
+	uint16_t raw_dx = 200;
+	double dx = ((raw_dx - kHalf) / kHalf) * kWidth;
+	uint16_t raw_dy = 200;
+	double dy = ((raw_dy - kHalf) / kHalf) * kHeight;
+
+	// Rotation
+	uint16_t rotation = 200;
+	double theta = 3.141592645 * (rotation - kHalf) / kHalf;
+
+	// Update the display.
+	main.update_transform(zoom, theta, dx, dy);
+}
+
+void Main::update_transform(double zoom, double theta, double dx, double dy) {
+	Matrix &m = transform();
+	m.reset();
+	m.translate(-kWidth / 2.0, -kHeight / 2.0);
+	m.zoom(zoom);
+	m.rotate(theta);
+	m.translate(kWidth / 2.0 / zoom + dx, kHeight / 2.0 / zoom + dy);  
+}
+*/
 
 void Main::loop() {
 
 }
 
 void setup() {
-  main.setup();
+	main.setup();
 }
 
 void loop() {
-  main.loop();
+	main.loop();
 }
 

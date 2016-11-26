@@ -28,17 +28,16 @@
 |	                                                                           |
 \******************************************************************************/
 #include "images/cloud.h"
-#include "images/rose.h"
+#include "images/skull.h"
 
-#define X_AXIS_LIMIT_MIN			(-200)
-#define Y_AXIS_LIMIT_MIN			(-100)
-#define X_AXIS_LIMIT_MAX			(200)
-#define Y_AXIS_LIMIT_MAX			(300)
+#define X_AXIS_LIMIT_MIN			(-1800)
+#define Y_AXIS_LIMIT_MIN			(-1400)
+#define X_AXIS_LIMIT_MAX			(700)
+#define Y_AXIS_LIMIT_MAX			(1800)
 
 #define SERIAL_BAUDRATE				(115200)
 #define SERIAL_BUFFER_SIZE			(60)
 
-#define STEPS_PER_RADIAN			(648.68)
 #define STEPS_DELAY_MS				(5)
 #define BEZIER_SEGMENTS				(30)
 
@@ -63,7 +62,7 @@ int16_t current_position_y;
 // uint8_t text_char_sep = 10;
 int16_t draw_x = 0;
 int16_t draw_y = 0;
-uint8_t draw_scale = 2;
+float draw_scale = 2;
 
 
 /* cuts the power to the motors (they will hold thier positions) 
@@ -90,6 +89,10 @@ void set_laser(bool is_on) {
 }
 /* go to the given axes position from current motors position */
 void absolute_steps(int16_t x, int16_t y) {
+	if (x < X_AXIS_LIMIT_MIN) return;
+	if (x > X_AXIS_LIMIT_MAX) return;
+	if (y < Y_AXIS_LIMIT_MIN) return;
+	if (y > Y_AXIS_LIMIT_MAX) return;
 	relative_steps(x - current_position_x, y - current_position_y);
 }
 
@@ -190,7 +193,7 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 	}
 }
 
-void draw_path(int16_t x, int16_t y, uint8_t scale) {
+void draw_path(int16_t x, int16_t y, float scale) {
 	draw_x = x;
 	draw_y = y;
 	draw_scale = scale;
@@ -206,13 +209,13 @@ void setup() {
 	set_home();
 	// -X is right
 	// -Y is left
-	relative_steps(000,-5000); set_home();
+	// relative_steps(000,-5000); set_home();
 	// set_laser(true); delay(100); set_laser(false);
 	
 	// draw_path(0, -180, 3);
-	draw_path(-600, -300, 3);
-	// draw_rose();
-	// draw_house();
+	draw_path(0, 500, 1.5);
+	// draw_cloud();
+	draw_skull();
 	go_home();
 }
 
