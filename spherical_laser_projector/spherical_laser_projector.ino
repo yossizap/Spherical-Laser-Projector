@@ -27,8 +27,9 @@
 | By A.E.TEC (Arad Eizen) 2016.                                                |
 |	                                                                           |
 \******************************************************************************/
-#include "images/cloud.h"
-#include "images/skull.h"
+#include <math.h>					// asin
+#include "paths/cloud.h"
+#include "paths/skull.h"
 
 #define X_AXIS_LIMIT_MIN			(-1800)
 #define Y_AXIS_LIMIT_MIN			(-1400)
@@ -37,9 +38,10 @@
 
 #define SERIAL_BAUDRATE				(115200)
 #define SERIAL_BUFFER_SIZE			(60)
-
 #define STEPS_DELAY_MS				(5)
 #define BEZIER_SEGMENTS				(30)
+#define STEPS_PER_RADIAN			(648.68)
+#define Z_SQARE						(10000) // 19600
 
 #define X_AXIS_A_PIN				(4)
 #define X_AXIS_B_PIN				(5)
@@ -62,7 +64,7 @@ int16_t current_position_y;
 // uint8_t text_char_sep = 10;
 int16_t draw_x = 0;
 int16_t draw_y = 0;
-float draw_scale = 2;
+double draw_scale = 2;
 
 
 /* cuts the power to the motors (they will hold thier positions) 
@@ -86,14 +88,6 @@ void set_laser(bool is_on) {
 		PORTB |= LASER_MASK;
 	else
 		PORTB &= ~LASER_MASK;
-}
-/* go to the given axes position from current motors position */
-void absolute_steps(int16_t x, int16_t y) {
-	if (x < X_AXIS_LIMIT_MIN) return;
-	if (x > X_AXIS_LIMIT_MAX) return;
-	if (y < Y_AXIS_LIMIT_MIN) return;
-	if (y > Y_AXIS_LIMIT_MAX) return;
-	relative_steps(x - current_position_x, y - current_position_y);
 }
 
 /* add/inc the motors current position by the given steps */
@@ -121,6 +115,22 @@ void relative_steps(int16_t x, int16_t y) {
 	disable_axes();
 }
 
+/* go to the given axes position from current motors position */
+void absolute_steps(int16_t x, int16_t y) {
+	if (x < X_AXIS_LIMIT_MIN) return;
+	if (x > X_AXIS_LIMIT_MAX) return;
+	if (y < Y_AXIS_LIMIT_MIN) return;
+	if (y > Y_AXIS_LIMIT_MAX) return;
+	relative_steps(x - current_position_x, y - current_position_y);
+}
+
+/* convert absolute point to absolute axes steps */
+void absolute_point(int32_t x, int32_t y) {
+	double n = sqrt(x * x + y * y + Z_SQARE);
+	double a = asin(y / n);
+	absolute_steps(round(STEPS_PER_RADIAN * asin(x / n / cos(a))), round(STEPS_PER_RADIAN * a));
+}
+
 /* set the current laser position to (0, 0) for trigo to work */
 void set_home() {
 	current_position_x = 0;
@@ -136,7 +146,8 @@ void go_home() {
 }
 
 void go_to(int16_t x, int16_t y) {
-	absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y);
+	// absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y);
+	absolute_point(x * draw_scale + draw_x, y * draw_scale + draw_y);
 }
 
 void draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
@@ -193,7 +204,7 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 	}
 }
 
-void draw_path(int16_t x, int16_t y, float scale) {
+void draw_path(int16_t x, int16_t y, double scale) {
 	draw_x = x;
 	draw_y = y;
 	draw_scale = scale;
@@ -213,9 +224,9 @@ void setup() {
 	// set_laser(true); delay(100); set_laser(false);
 	
 	// draw_path(0, -180, 3);
-	draw_path(0, 500, 1.5);
-	// draw_cloud();
-	draw_skull();
+	draw_path(-20, 50, 0.5);
+	draw_cloud();
+	// draw_skull();
 	go_home();
 }
 
@@ -233,8 +244,8 @@ void loop() {
 	corners++;
 	set_laser(true);
 	while (corners) {
-		tmp.x = p->x + round(size * cos(current_angle));
-		tmp.y = p->y + round(size * sin(current_angle));
+		tmp.x = x + round(size * cos(current_angle));
+		tmp.y = y + round(size * sin(current_angle));
 		absolute_steps(&tmp);
 		current_angle += step_angle;
 		corners--;
@@ -249,13 +260,13 @@ void loop() {
 
 /*void get_text_size(char * text, xy_point * p) {
 	xy_point tmp;
-	p->x = (*text ? -text_char_sep : 0);
-	p->y = 0;
+	x = (*text ? -text_char_sep : 0);
+	y = 0;
 	while (*text) {
 		get_path_size(char_to_path(*text++), &tmp);
-		p->x += tmp->x + text_char_sep;
-		if (p->y < tmp->y)
-			p->y = tmp->y;
+		x += tmx + text_char_sep;
+		if (y < tmy)
+			y = tmy;
 	}
 }*/
 
