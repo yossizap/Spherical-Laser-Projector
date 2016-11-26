@@ -27,7 +27,7 @@
 | By A.E.TEC (Arad Eizen) 2016.                                                |
 |	                                                                           |
 \******************************************************************************/
-// #include "arial_font.h"
+// #include "cloud.h"
 
 #define X_AXIS_LIMIT_MIN			(-200)
 #define Y_AXIS_LIMIT_MIN			(-100)
@@ -39,6 +39,7 @@
 
 #define STEPS_PER_RADIAN			(648.68)
 #define STEP_DELAY_MS				(4)
+#define DRAW_SCALE					(7)
 
 #define X_AXIS_A_PIN				(4)
 #define X_AXIS_B_PIN				(5)
@@ -183,6 +184,62 @@ void draw_path(char * path, xy_point * p) {
 		x += draw_char(x, y, *text++, scale) + 1;
 }*/
 
+void go_to(uint16_t x, uint16_t y) {
+	xy_point tmp = {x * DRAW_SCALE, y * DRAW_SCALE};
+	absolute_steps(&tmp);
+}
+/*
+vec2 getBezierPoint( vec2* points, int numPoints, float t ) {
+    vec2* tmp = new vec2[numPoints];
+    memcpy(tmp, points, numPoints * sizeof(vec2));
+    int i = numPoints - 1;
+    while (i > 0) {
+        for (int k = 0; k < i; k++)
+            tmp[k] = tmp[k] + t * ( tmp[k+1] - tmp[k] );
+        i--;
+    }
+    vec2 answer = tmp[0];
+    delete[] tmp;
+    return answer;
+}
+*/
+void line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
+	go_to(x0, y0);
+	set_laser(true);
+	go_to(x1, y1);
+}
+
+void arc(uint16_t x0, uint16_t y0, uint16_t radius, uint16_t rotation, uint16_t arc, uint16_t sweep, uint16_t x1, uint16_t y1) {
+	
+}
+
+void quadratic_bezier(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
+	/* number of segments for the curve */
+	#define N_SEG 20
+	go_to(x0, y0);
+	set_laser(true);
+	uint16_t pts[N_SEG + 1][2];
+	for (uint8_t i = 0; i <= N_SEG; ++i) {
+		double t = (double)i / (double)N_SEG;
+		double a = pow((1.0 - t), 2.0);
+		double b = 2.0 * t * (1.0 - t);
+		double c = pow(t, 2.0);
+		double x = a * x0 + b * x1 + c * x2;
+		double y = a * y0 + b * y1 + c * y2;
+		pts[i][0] = x;
+		pts[i][1] = y;
+	}
+
+	/* draw segments */
+	for (uint8_t i = 0; i < N_SEG; ++i) {
+		line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+	}
+}
+
+void cubic_bezier(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3) {
+	
+}
+
 /* called once at power-on */
 void setup() {
 	Serial.begin(SERIAL_BAUDRATE);
@@ -191,10 +248,15 @@ void setup() {
 	DDRB |= LASER_MASK;			// (8) OUTPUT
 	set_laser(false);			// turn off laser
 	set_home();
+	// go_to(40,50);
+	// set_home();
+	draw_cloud();
+	go_home();
+	quadratic_bezier(0,0,1,1,2,2);
 }
 
 /* called repeatedly after "setup" */
 void loop() {
-	xy_point tmp = {0, 0};
-	draw_polygon(&tmp, 4, 100, 0);
+	// xy_point tmp = {0, 0};
+	// draw_polygon(&tmp, 4, 100, 0);
 }
