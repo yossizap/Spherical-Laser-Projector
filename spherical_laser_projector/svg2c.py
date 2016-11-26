@@ -78,8 +78,9 @@ def generate_code(paths):
 
 
 def round_float(number):
-    return round(number * ROUNDING_MULTIPLIER)
+    return int(round(number * ROUNDING_MULTIPLIER))
 
+  
 
 def create_function_call(func_name, arguments):
     '''
