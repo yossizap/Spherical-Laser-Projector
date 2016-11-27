@@ -27,19 +27,21 @@
 | By A.E.TEC (Arad Eizen) 2016.                                                |
 |	                                                                           |
 \******************************************************************************/
-// #include "cloud.h"
+#include <math.h>					// asin
+#include "paths/cloud.h"
+#include "paths/skull.h"
 
-#define X_AXIS_LIMIT_MIN			(-200)
-#define Y_AXIS_LIMIT_MIN			(-100)
-#define X_AXIS_LIMIT_MAX			(200)
-#define Y_AXIS_LIMIT_MAX			(300)
+#define X_AXIS_LIMIT_MIN			(-1800)
+#define Y_AXIS_LIMIT_MIN			(-1400)
+#define X_AXIS_LIMIT_MAX			(700)
+#define Y_AXIS_LIMIT_MAX			(1800)
 
 #define SERIAL_BAUDRATE				(115200)
 #define SERIAL_BUFFER_SIZE			(60)
-
+#define STEPS_DELAY_MS				(5)
+#define BEZIER_SEGMENTS				(30)
 #define STEPS_PER_RADIAN			(648.68)
-#define STEP_DELAY_MS				(4)
-#define DRAW_SCALE					(7)
+#define Z_SQARE						(10000) // 19600
 
 #define X_AXIS_A_PIN				(4)
 #define X_AXIS_B_PIN				(5)
@@ -53,18 +55,16 @@
 
 #define LASER_MASK					(0x01)
 
-const uint8_t STEPS_MASKS[] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
+// const uint8_t STEPS_MASKS[] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
+const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0b0011, 0b0001};
 
-typedef struct xy_point {
-	int16_t x;
-	int16_t y;
-};
-
-uint8_t steps_delay_ms = STEP_DELAY_MS;
-xy_point current_position;
-bool text_right_diraction = false;
-uint8_t text_char_sep = 10;
-uint8_t draw_scale = 10;
+int16_t current_position_x;
+int16_t current_position_y;
+// bool text_right_diraction = false;
+// uint8_t text_char_sep = 10;
+int16_t draw_x = 0;
+int16_t draw_y = 0;
+double draw_scale = 2;
 
 
 /* cuts the power to the motors (they will hold thier positions) 
@@ -77,9 +77,9 @@ void disable_axes() {
 /* sets the motors positions to match "current_position" global
     must call with each change of 1 step in "current_position" global */
 void step_to_current_position() {
-	PORTC = (PORTC & 0xF0) | STEPS_MASKS[current_position.x & 7];
-	PORTD = (PORTD & 0x0F) | (STEPS_MASKS[current_position.y & 7] << 4);
-	delay(steps_delay_ms);
+	PORTC = (PORTC & 0xF0) | STEPS_MASKS[current_position_y & 7];
+	PORTD = (PORTD & 0x0F) | (STEPS_MASKS[current_position_x & 7] << 4);
+	delay(STEPS_DELAY_MS);
 }
 
 /* turn laser on or off (pull mosfet gate down to turn the laser on) */
@@ -90,84 +90,187 @@ void set_laser(bool is_on) {
 		PORTB &= ~LASER_MASK;
 }
 
-/* go to the given axes position from current motors position */
-void absolute_steps(xy_point * p) {
-	xy_point steps = {p->x - current_position.x, p->y - current_position.y};
-	relative_steps(&steps);
-}
-
 /* add/inc the motors current position by the given steps */
-void relative_steps(xy_point * p) {
+void relative_steps(int16_t x, int16_t y) {
 	int32_t steps, err, e;
-	xy_point delta = {abs(p->x), abs(p->y)};
-	xy_point step = {(p->x > 0 ? 1 : (p->x < 0 ? -1 : 0)), (p->y > 0 ? 1 : (p->y < 0 ? -1 : 0))};
+	int16_t delta_x = abs(x);
+	int16_t delta_y = abs(y);
+	int16_t step_x = (x > 0 ? 1 : (x < 0 ? -1 : 0));
+	int16_t step_y = (y > 0 ? 1 : (y < 0 ? -1 : 0));
 
-	steps = max(delta.x, delta.y);
-	err = (delta.x > delta.y ? delta.x : -delta.y) / 2;
+	steps = max(delta_x, delta_y);
+	err = (delta_x > delta_y ? delta_x : -delta_y) / 2;
 	while (steps--) {
 		e = err;
-		if (e >= -delta.x) {
-			err -= delta.y;
-			current_position.x += step.x;
+		if (e >= -delta_x) {
+			err -= delta_y;
+			current_position_x += step_x;
 		}
-		if (e < delta.y) {
-			err += delta.x;
-			current_position.y += step.y;
+		if (e < delta_y) {
+			err += delta_x;
+			current_position_y += step_y;
 		}
 		step_to_current_position();
 	}
+	disable_axes();
+}
+
+/* go to the given axes position from current motors position */
+void absolute_steps(int16_t x, int16_t y) {
+	if (x < X_AXIS_LIMIT_MIN) return;
+	if (x > X_AXIS_LIMIT_MAX) return;
+	if (y < Y_AXIS_LIMIT_MIN) return;
+	if (y > Y_AXIS_LIMIT_MAX) return;
+	relative_steps(x - current_position_x, y - current_position_y);
+}
+
+/* convert absolute point to absolute axes steps */
+void absolute_point(int32_t x, int32_t y) {
+	double n = sqrt(x * x + y * y + Z_SQARE);
+	double a = asin(y / n);
+	absolute_steps(round(STEPS_PER_RADIAN * asin(x / n / cos(a))), round(STEPS_PER_RADIAN * a));
 }
 
 /* set the current laser position to (0, 0) for trigo to work */
 void set_home() {
-	current_position.x = 0;
-	current_position.y = 0;
+	current_position_x = 0;
+	current_position_y = 0;
 	step_to_current_position();
 	disable_axes();
 }
 
 /* turn laser off and put projector in home position */
 void go_home() {
-	xy_point p = {0, 0};
 	set_laser(false);
-	absolute_steps(&p);
+	absolute_steps(0, 0);
 }
 
+void go_to(int16_t x, int16_t y) {
+	// absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y);
+	absolute_point(x * draw_scale + draw_x, y * draw_scale + draw_y);
+}
+
+void draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
+	go_to(x0, y0);
+	set_laser(true);
+	go_to(x1, y1);
+	set_laser(false);
+}
+
+void draw_arc(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t arc, int16_t sweep, int16_t x1, int16_t y1) {
+	// TODO
+}
+
+void draw_quadratic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
+	go_to(x0, y0);
+	set_laser(true);
+	int16_t pts[BEZIER_SEGMENTS + 1][2];
+	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; ++i) {
+		double t = (double)i / (double)BEZIER_SEGMENTS;
+		double a = pow((1.0 - t), 2.0);
+		double b = 2.0 * t * (1.0 - t);
+		double c = pow(t, 2.0);
+		double x = a * x0 + b * x1 + c * x2;
+		double y = a * y0 + b * y1 + c * y2;
+		pts[i][0] = x;
+		pts[i][1] = y;
+	}
+
+	/* draw segments */
+	for (uint8_t i = 0; i < BEZIER_SEGMENTS; ++i) {
+		draw_line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+	}
+}
+
+void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3) {
+	go_to(x0, y0);
+	set_laser(true);
+	int16_t pts[BEZIER_SEGMENTS + 1][2];
+	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; ++i) {
+		double t = (double)i / (double)BEZIER_SEGMENTS;
+		double a = pow((1.0 - t), 3.0);
+		double b = 3.0 * t * pow((1.0 - t), 2.0);
+		double c = 3.0 * pow(t, 2.0) * (1.0 - t);
+		double d = pow(t, 3.0);
+		double x = a * x0 + b * x1 + c * x2 + d * x3;
+		double y = a * y0 + b * y1 + c * y2 + d * y3;
+		pts[i][0] = x;
+		pts[i][1] = y;
+	}
+
+	/* draw segments */
+	for (uint8_t i = 0; i < BEZIER_SEGMENTS; ++i) {
+		draw_line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
+	}
+}
+
+void draw_path(int16_t x, int16_t y, double scale) {
+	draw_x = x;
+	draw_y = y;
+	draw_scale = scale;
+}
+
+/* called once at power-on */
+void setup() {
+	Serial.begin(SERIAL_BAUDRATE);
+	DDRD |= 0xF0;				// (4 - 7) OUTPUTS
+	DDRC |= 0x0F;				// (A0 - A3) OUTPUTS
+	DDRB |= LASER_MASK;			// (8) OUTPUT
+	set_laser(false);			// turn off laser
+	set_home();
+	// -X is right
+	// -Y is left
+	// relative_steps(000,-5000); set_home();
+	// set_laser(true); delay(100); set_laser(false);
+	
+	// draw_path(0, -180, 3);
+	draw_path(-20, 50, 0.5);
+	draw_cloud();
+	// draw_skull();
+	go_home();
+}
+
+/* called repeatedly after "setup" */
+void loop() {
+	
+}
+
+
 /* draw regular polygon x, y are the center point with absolute_steps */
-void draw_polygon(xy_point * p, uint8_t corners, int16_t size, int16_t start_angle) {
+/*void draw_polygon(xy_point * p, uint8_t corners, int16_t size, int16_t start_angle) {
 	xy_point tmp;
 	double current_angle = PI * start_angle / 180.0;
 	double step_angle = PI * 2.0 / corners;
 	corners++;
 	set_laser(true);
 	while (corners) {
-		tmp.x = p->x + round(size * cos(current_angle));
-		tmp.y = p->y + round(size * sin(current_angle));
+		tmp.x = x + round(size * cos(current_angle));
+		tmp.y = y + round(size * sin(current_angle));
 		absolute_steps(&tmp);
 		current_angle += step_angle;
 		corners--;
 	}
 	set_laser(false);
 	disable_axes();
-}
+}*/
 
 /*void get_path_size(char * path, xy_point * p) {
 	
-}
+}*/
 
-void get_text_size(char * text, xy_point * p) {
+/*void get_text_size(char * text, xy_point * p) {
 	xy_point tmp;
-	p->x = (*text ? -text_char_sep : 0);
-	p->y = 0;
+	x = (*text ? -text_char_sep : 0);
+	y = 0;
 	while (*text) {
 		get_path_size(char_to_path(*text++), &tmp);
-		p->x += tmp->x + text_char_sep;
-		if (p->y < tmp->y)
-			p->y = tmp->y;
+		x += tmx + text_char_sep;
+		if (y < tmy)
+			y = tmy;
 	}
-}
+}*/
 
-void draw_path(char * path, xy_point * p) {
+/*void draw_path(char * path, xy_point * p) {
 	
 }*/
 
@@ -183,80 +286,3 @@ void draw_path(char * path, xy_point * p) {
 	while (*text)
 		x += draw_char(x, y, *text++, scale) + 1;
 }*/
-
-void go_to(uint16_t x, uint16_t y) {
-	xy_point tmp = {x * DRAW_SCALE, y * DRAW_SCALE};
-	absolute_steps(&tmp);
-}
-/*
-vec2 getBezierPoint( vec2* points, int numPoints, float t ) {
-    vec2* tmp = new vec2[numPoints];
-    memcpy(tmp, points, numPoints * sizeof(vec2));
-    int i = numPoints - 1;
-    while (i > 0) {
-        for (int k = 0; k < i; k++)
-            tmp[k] = tmp[k] + t * ( tmp[k+1] - tmp[k] );
-        i--;
-    }
-    vec2 answer = tmp[0];
-    delete[] tmp;
-    return answer;
-}
-*/
-void line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
-	go_to(x0, y0);
-	set_laser(true);
-	go_to(x1, y1);
-}
-
-void arc(uint16_t x0, uint16_t y0, uint16_t radius, uint16_t rotation, uint16_t arc, uint16_t sweep, uint16_t x1, uint16_t y1) {
-	
-}
-
-void quadratic_bezier(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2) {
-	/* number of segments for the curve */
-	#define N_SEG 20
-	go_to(x0, y0);
-	set_laser(true);
-	uint16_t pts[N_SEG + 1][2];
-	for (uint8_t i = 0; i <= N_SEG; ++i) {
-		double t = (double)i / (double)N_SEG;
-		double a = pow((1.0 - t), 2.0);
-		double b = 2.0 * t * (1.0 - t);
-		double c = pow(t, 2.0);
-		double x = a * x0 + b * x1 + c * x2;
-		double y = a * y0 + b * y1 + c * y2;
-		pts[i][0] = x;
-		pts[i][1] = y;
-	}
-
-	/* draw segments */
-	for (uint8_t i = 0; i < N_SEG; ++i) {
-		line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
-	}
-}
-
-void cubic_bezier(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3) {
-	
-}
-
-/* called once at power-on */
-void setup() {
-	Serial.begin(SERIAL_BAUDRATE);
-	DDRD |= 0xF0;				// (4 - 7) OUTPUTS
-	DDRC |= 0x0F;				// (A0 - A3) OUTPUTS
-	DDRB |= LASER_MASK;			// (8) OUTPUT
-	set_laser(false);			// turn off laser
-	set_home();
-	// go_to(40,50);
-	// set_home();
-	draw_cloud();
-	go_home();
-	quadratic_bezier(0,0,1,1,2,2);
-}
-
-/* called repeatedly after "setup" */
-void loop() {
-	// xy_point tmp = {0, 0};
-	// draw_polygon(&tmp, 4, 100, 0);
-}

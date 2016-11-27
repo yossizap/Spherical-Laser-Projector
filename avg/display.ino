@@ -8,7 +8,7 @@
 
 #define STEPS_PER_RADIAN			(648.68)
 #define STEPS_DELAY_MS				(5)
-#define DRAW_SCALE					(3)
+#define DRAW_SCALE					(4)
 
 #define X_AXIS_A_PIN				(4)
 #define X_AXIS_B_PIN				(5)
@@ -269,16 +269,4 @@ void Display::transform_cubic_bezier(Point<fixed> *p) {
   p[3] = transform().transform(p[3]);
   draw_cubic_bezier_fixed_diffs(p);
 #endif
-}
-
-#undef TX
-#undef TY
-
-void Display::update_transform(double zoom, double theta, double dx, double dy) {
-  Matrix &m = transform();
-  m.reset();
-  m.translate(-kWidth / 2.0, -kHeight / 2.0);
-  m.zoom(zoom);
-  m.rotate(theta);
-  m.translate(kWidth / 2.0 / zoom + dx, kHeight / 2.0 / zoom + dy);  
 }
