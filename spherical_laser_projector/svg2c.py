@@ -37,9 +37,7 @@ def generate_code(paths, close=True):
                 
             if isinstance(instruction, svg.path.QuadraticBezier):
                 gen_code += create_function_call(QUADRATIC_BEZIER_FUNC_NAME,
-                        "{XSTART}, {YSTART}, {XCNT}, {YCNT}, {XEND}, {YEND}".format(
-                            XSTART=round_float(instruction.start.real), 
-                            YSTART=round_float(instruction.start.imag),
+                        "{XCNT}, {YCNT}, {XEND}, {YEND}".format(
                             XCNT=round_float(instruction.control1.real), 
                             YCNT=round_float(instruction.control1.imag), 
                             XEND=round_float(instruction.end.real), 
@@ -47,17 +45,13 @@ def generate_code(paths, close=True):
                         )
             elif isinstance(instruction, svg.path.Line):
                 gen_code += create_function_call(LINE_FUNC_NAME, 
-                        "{XSTART}, {YSTART}, {XEND}, {YEND}".format(
-                            XSTART=round_float(instruction.start.real), 
-                            YSTART=round_float(instruction.start.imag),
+                        "{XEND}, {YEND}".format(
                             XEND=round_float(instruction.end.real), 
                             YEND=round_float(instruction.end.imag),)
                         )
             elif isinstance(instruction, svg.path.CubicBezier):
                 gen_code += create_function_call(CUBIC_BEZIER_FUNC_NAME,
-                        "{XSTART}, {YSTART}, {XCNT1}, {YCNT1}, {XCNT2}, {YCNT2}, {XEND}, {YEND}".format(
-                            XSTART=round_float(instruction.start.real), 
-                            YSTART=round_float(instruction.start.imag),
+                        "{XCNT1}, {YCNT1}, {XCNT2}, {YCNT2}, {XEND}, {YEND}".format(
                             XCNT1=round_float(instruction.control1.real), 
                             YCNT1=round_float(instruction.control1.imag), 
                             XCNT2=round_float(instruction.control2.real), 
@@ -67,9 +61,7 @@ def generate_code(paths, close=True):
                         )
             elif isinstance(instruction, svg.path.Arc):
                 gen_code += create_function_call(ARC_FUNC_NAME, 
-                    "{XSTART}, {YSTART}, {XRADIUS}, {YRADIUS}, {ROTATION}, {ARC}, {SWEEP}, {XEND}, {YEND}".format(
-                            XSTART=round_float(instruction.start.real), 
-                            YSTART=round_float(instruction.start.imag),
+                    "{XRADIUS}, {YRADIUS}, {ROTATION}, {ARC}, {SWEEP}, {XEND}, {YEND}".format(
                             XRADIUS=round_float(instruction.radius.real), 
                             YRADIUS=round_float(instruction.radius.imag),
                             ROTATION=round_float(instruction.rotation),
@@ -82,9 +74,7 @@ def generate_code(paths, close=True):
         # If close is enabled we have to draw a line back to the starting position from this instruction's end position
         if True == close:
             gen_code += create_function_call(LINE_FUNC_NAME,
-                "{XSTART}, {YSTART}, {XEND}, {YEND}".format(
-                    XSTART=round_float(instruction.start.real), 
-                    YSTART=round_float(instruction.start.imag),
+                "{XEND}, {YEND}".format(
                     XEND=round_float(start_x), 
                     YEND=round_float(start_y),)
                 )
@@ -128,9 +118,9 @@ def create_function_wrapper(func_name, func_content):
     indent = "\t"
     indented_code = ''.join(indent+line for line in func_content.splitlines(True))
     wrapper = "extern void set_laser(bool is_on);\n"
-    wrapper += "extern void draw_line(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);\n"
-    wrapper += "extern void draw_quadratic_bezier(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);\n"
-    wrapper += "extern void draw_cubic_bezier(uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3);\n"
+    wrapper += "extern void draw_line(uint16_t x1, uint16_t y1);\n"
+    wrapper += "extern void draw_quadratic_bezier(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);\n"
+    wrapper += "extern void draw_cubic_bezier(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3);\n"
     wrapper += "void %s()\n{\n%s}" % (func_name, indented_code)
     return wrapper
 
