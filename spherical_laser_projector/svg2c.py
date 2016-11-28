@@ -236,11 +236,12 @@ def create_function_wrapper(func_name, func_content):
     indent = "\t"
     indented_code = ''.join(indent+line for line in func_content.splitlines(True))
     
-    wrapper = "extern void %s(uint16_t x1, uint16_t y1);\n)" % DRAW_START_FUNC_NAME
+    wrapper = "extern void %s(int16_t x1, int16_t y1);\n)" % DRAW_START_FUNC_NAME
     wrapper += "extern void %s(bool is_on);\n" % SET_LASER_FUNC_NAME
-    wrapper += "extern void %s(uint16_t x1, uint16_t y1);\n" % LINE_FUNC_NAME
-    wrapper += "extern void %s(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2);\n" % QUADRATIC_BEZIER_FUNC_NAME
-    wrapper += "extern void %s(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t x3, uint16_t y3);\n" % CUBIC_BEZIER_FUNC_NAME
+    wrapper += "extern void %s(int16_t x1, int16_t y1);\n" % LINE_FUNC_NAME
+    wrapper += "extern void %s(int16_t x1, int16_t y1, int16_t x2, int16_t y2);\n" % QUADRATIC_BEZIER_FUNC_NAME
+    wrapper += "extern void %s(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3);\n" % CUBIC_BEZIER_FUNC_NAME
+    wrapper += "extern void %s(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t arc, int16_t sweep, int16_t x1, int16_t y1) ;\n" % ARC_FUNC_NAME
     wrapper += "void %s()\n{\n%s}" % (func_name, indented_code)
     return wrapper
 
@@ -280,6 +281,6 @@ if "__main__" == __name__:
         code = generate_function_calls(paths, options.close)
         code = create_function_wrapper("draw_" + os.path.splitext(os.path.basename(options.output_file))[0], code)
     
-    with open("%s.h" % (os.path.basename(options.output_file),), "wb") as f:
+    with open(("%s.h" % options.output_file), "wb") as f:
         f.write(create_doc("WARNING: Automatically generated code, do not modify."))
         f.write(code)
