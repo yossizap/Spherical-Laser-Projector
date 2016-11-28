@@ -31,14 +31,16 @@
 #include "paths/cloud.h"
 #include "paths/skull.h"
 
-#define X_AXIS_LIMIT_MIN			(-1800)
-#define Y_AXIS_LIMIT_MIN			(-1400)
-#define X_AXIS_LIMIT_MAX			(700)
-#define Y_AXIS_LIMIT_MAX			(1800)
+
+#define CORNER_DEG					(1010)
+#define X_AXIS_LIMIT_MIN			(-CORNER_DEG)
+#define Y_AXIS_LIMIT_MIN			(-1500)
+#define X_AXIS_LIMIT_MAX			(CORNER_DEG * 2)
+#define Y_AXIS_LIMIT_MAX			(1500)
 
 #define SERIAL_BAUDRATE				(115200)
 #define SERIAL_BUFFER_SIZE			(60)
-#define STEPS_DELAY_MS				(5)
+#define STEPS_DELAY_MS				(4)
 #define BEZIER_SEGMENTS				(30)
 #define STEPS_PER_RADIAN			(648.68)
 #define Z_SQARE						(10000) // 19600
@@ -48,6 +50,7 @@
 #define X_AXIS_C_PIN				(6)
 #define X_AXIS_D_PIN				(7)
 #define LASER_PIN					(8)
+#define BUTTON_PIN					(12)
 #define Y_AXIS_A_PIN				(A0)
 #define Y_AXIS_B_PIN				(A1)
 #define Y_AXIS_C_PIN				(A2)
@@ -60,12 +63,22 @@ const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0
 
 int16_t current_position_x;
 int16_t current_position_y;
+int16_t draw_last_x;
+int16_t draw_last_y;
 // bool text_right_diraction = false;
 // uint8_t text_char_sep = 10;
 int16_t draw_x = 0;
 int16_t draw_y = 0;
 double draw_scale = 2;
 
+
+/* turn laser on or off (pull mosfet gate down to turn the laser on) */
+void set_laser(bool is_on) {
+	if (is_on)
+		PORTB |= LASER_MASK;
+	else
+		PORTB &= ~LASER_MASK;
+}
 
 /* cuts the power to the motors (they will hold thier positions) 
 	must call after done steping the motors with "step_to_current_position" */
@@ -82,12 +95,12 @@ void step_to_current_position() {
 	delay(STEPS_DELAY_MS);
 }
 
-/* turn laser on or off (pull mosfet gate down to turn the laser on) */
-void set_laser(bool is_on) {
-	if (is_on)
-		PORTB |= LASER_MASK;
-	else
-		PORTB &= ~LASER_MASK;
+void print_point(int16_t x, int16_t y) {
+	Serial.print("(");
+	Serial.print(x);
+	Serial.print(", ");
+	Serial.print(y);
+	Serial.print(")\n");
 }
 
 /* add/inc the motors current position by the given steps */
@@ -113,6 +126,7 @@ void relative_steps(int16_t x, int16_t y) {
 		step_to_current_position();
 	}
 	disable_axes();
+	print_point(current_position_x, current_position_y);
 }
 
 /* go to the given axes position from current motors position */
@@ -146,8 +160,8 @@ void go_home() {
 }
 
 void go_to(int16_t x, int16_t y) {
-	// absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y);
-	absolute_point(x * draw_scale + draw_x, y * draw_scale + draw_y);
+	absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y);
+	// absolute_point(x * draw_scale + draw_x, y * draw_scale + draw_y);
 }
 
 void draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
@@ -162,8 +176,6 @@ void draw_arc(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t 
 }
 
 void draw_quadratic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
-	go_to(x0, y0);
-	set_laser(true);
 	int16_t pts[BEZIER_SEGMENTS + 1][2];
 	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; ++i) {
 		double t = (double)i / (double)BEZIER_SEGMENTS;
@@ -177,14 +189,14 @@ void draw_quadratic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16
 	}
 
 	/* draw segments */
+	go_to(x0, y0);
+	set_laser(true);
 	for (uint8_t i = 0; i < BEZIER_SEGMENTS; ++i) {
 		draw_line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
 	}
 }
 
 void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3) {
-	go_to(x0, y0);
-	set_laser(true);
 	int16_t pts[BEZIER_SEGMENTS + 1][2];
 	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; ++i) {
 		double t = (double)i / (double)BEZIER_SEGMENTS;
@@ -199,15 +211,61 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 	}
 
 	/* draw segments */
+	go_to(x0, y0);
+	set_laser(true);
 	for (uint8_t i = 0; i < BEZIER_SEGMENTS; ++i) {
 		draw_line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
 	}
+}
+
+void draw_start(int16_t x0, int16_t y0) {
+	go_to(x0, y0);
+	draw_last_x = x0;
+	draw_last_y = y0;
+}
+
+void draw_line(int16_t x1, int16_t y1) {
+	draw_line(draw_last_x, draw_last_y, x1, y1);
+	draw_last_x = x1;
+	draw_last_y = y1;
+}
+
+void draw_quadratic_bezier(int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
+	draw_quadratic_bezier(draw_last_x, draw_last_y,  x1,  y1,  x2,  y2);
+	draw_last_x = x2;
+	draw_last_y = y2;
+}
+
+void draw_cubic_bezier(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3) {
+	draw_cubic_bezier(draw_last_x, draw_last_y,  x1,  y1,  x2,  y2,  x3,  y3);
+	draw_last_x = x3;
+	draw_last_y = y3;
 }
 
 void draw_path(int16_t x, int16_t y, double scale) {
 	draw_x = x;
 	draw_y = y;
 	draw_scale = scale;
+}
+
+void test() {
+	/*for (uint16_t i = 0; i < 1010*2; i++)
+		relative_steps(1, 0);
+	delay(3000);
+	go_home();
+	for (uint16_t i = 0; i < 1010; i++)
+		relative_steps(-1, 0);
+	delay(3000);
+	go_home();*/
+	/*
+	for (uint16_t i = 0; i < 1500; i++)
+		relative_steps(0, 1);
+	delay(3000);
+	go_home();
+	for (uint16_t i = 0; i < 1500; i++)
+		relative_steps(0, -1);
+	delay(3000);
+	go_home();*/
 }
 
 /* called once at power-on */
@@ -217,24 +275,42 @@ void setup() {
 	DDRC |= 0x0F;				// (A0 - A3) OUTPUTS
 	DDRB |= LASER_MASK;			// (8) OUTPUT
 	set_laser(false);			// turn off laser
+	pinMode(BUTTON_PIN, INPUT_PULLUP);
 	set_home();
 	// -X is right
 	// -Y is left
-	// relative_steps(000,-5000); set_home();
+	// relative_steps(20, 0); set_home();
 	// set_laser(true); delay(100); set_laser(false);
 	
 	// draw_path(0, -180, 3);
-	draw_path(-20, 50, 0.5);
-	draw_cloud();
+	// draw_path(-20, 50, 0.5);
+	// draw_cloud();
+	// test();
 	// draw_skull();
 	go_home();
 }
 
 /* called repeatedly after "setup" */
 void loop() {
-	
+	static uint8_t index = 0;
+	while(digitalRead(BUTTON_PIN));
+	switch (index++) {
+		case 0:
+			draw_path(0, 400, 2);
+			draw_cloud();
+		break;
+		case 1:
+			draw_path(400, 300, 1.5);
+			draw_skull();
+		break;
+		default:
+			index = 0;
+		break;
+	}
+	go_home();
+	delay(1000);
+	while(!digitalRead(BUTTON_PIN));
 }
-
 
 /* draw regular polygon x, y are the center point with absolute_steps */
 /*void draw_polygon(xy_point * p, uint8_t corners, int16_t size, int16_t start_angle) {
