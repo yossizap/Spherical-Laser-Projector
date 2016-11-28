@@ -29,7 +29,7 @@
 \******************************************************************************/
 #include <math.h>					// asin
 #include "paths/cloud.h"
-#include "paths/skull.h"
+// #include "paths/skull.h"
 
 
 #define CORNER_DEG					(1010)
@@ -60,6 +60,29 @@
 
 // const uint8_t STEPS_MASKS[] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
 const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0b0011, 0b0001};
+const uint8_t PATH_COMMAND_ARGUMENTS[] = {
+	'm', 2,
+	'h', 1,
+	'v', 1,
+	'l', 2,
+	'z', 0,
+	'q', 4,
+	't', 2,
+	'c', 6,
+	's', 4,
+	'a', 7,
+	'M', 2,
+	'H', 1,
+	'V', 1,
+	'L', 2,
+	'Z', 0,
+	'Q', 4,
+	'T', 2,
+	'C', 6,
+	'S', 4,
+	'A', 7,
+	'e', 0,
+};
 
 int16_t current_position_x;
 int16_t current_position_y;
@@ -218,34 +241,139 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 	}
 }
 
-void draw_start(int16_t x0, int16_t y0) {
-	go_to(x0, y0);
-	draw_last_x = x0;
-	draw_last_y = y0;
-}
-
-void draw_line(int16_t x1, int16_t y1) {
-	draw_line(draw_last_x, draw_last_y, x1, y1);
-	draw_last_x = x1;
-	draw_last_y = y1;
-}
-
-void draw_quadratic_bezier(int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
-	draw_quadratic_bezier(draw_last_x, draw_last_y,  x1,  y1,  x2,  y2);
-	draw_last_x = x2;
-	draw_last_y = y2;
-}
-
-void draw_cubic_bezier(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3) {
-	draw_cubic_bezier(draw_last_x, draw_last_y,  x1,  y1,  x2,  y2,  x3,  y3);
-	draw_last_x = x3;
-	draw_last_y = y3;
-}
-
 void draw_path(int16_t x, int16_t y, double scale) {
+	uint8_t command;
+	uint8_t arguments_count;
+	uint16_t start_x, start_y, a_x, a_y, b_x, b_y;
+	uint16_t m_x = 0, m_y = 0;
+	uint16_t arguments[7];
+
 	draw_x = x;
 	draw_y = y;
 	draw_scale = scale;
+
+	PGM_P path = CLOUD_PATH;
+
+	for (;;) {
+		command = pgm_read_byte(path++);
+		Serial.print("command: ");
+		Serial.println(command);
+		arguments_count = -1;
+		for (uint8_t i = 0; i < sizeof(PATH_COMMAND_ARGUMENTS); i += 2) {
+			Serial.println(PATH_COMMAND_ARGUMENTS[i]);
+			if (command == PATH_COMMAND_ARGUMENTS[i]) {
+				arguments_count = PATH_COMMAND_ARGUMENTS[i + 1];
+				break;
+			}
+		}
+		arguments_count *= sizeof(*arguments);
+		Serial.print("arguments_count: ");
+		Serial.println(arguments_count);
+		if (arguments_count > sizeof(arguments) * sizeof(*arguments)) {
+			Serial.println("Command error!");
+			return;
+		}
+		
+		memcpy_P(arguments, path, arguments_count);
+		path += arguments_count;
+
+		switch (command) {
+			case 'm':
+			case 'M':
+				set_laser(false);
+				m_x = arguments[0];
+				m_y = arguments[1];
+				start_x = m_x;
+				start_y = m_y;
+			break;
+			case 'h':
+				arguments[0] += start_x;
+			case 'H':
+				draw_line(start_x, start_y, arguments[0], start_y);
+				start_x = arguments[0];
+			break;
+			case 'v':
+				arguments[0] += start_y;
+			case 'V':
+				draw_line(start_x, start_y, start_x, arguments[0]);
+				start_y = arguments[0];
+			break;
+			case 'l':
+				arguments[0] += start_x;
+				arguments[1] += start_y;
+			case 'L':
+				draw_line(start_x, start_y, arguments[0], arguments[1]);
+				start_x = arguments[0];
+				start_y = arguments[1];
+			break;
+			case 'z':
+			case 'Z':
+				draw_line(start_x, start_y, m_x, m_y);
+				start_x = m_x;
+				start_y = m_y;
+			break;
+			case 'q':
+				arguments[0] += start_x;
+				arguments[1] += start_y;
+				arguments[2] += start_x;
+				arguments[3] += start_y;
+			case 'Q':
+				draw_quadratic_bezier(start_x, start_y, arguments[0], arguments[1], arguments[2], arguments[3]);
+				a_x = arguments[0];
+				a_y = arguments[1];
+				start_x = arguments[2];
+				start_y = arguments[3];
+			break;
+			case 't':
+				arguments[0] += start_x;
+				arguments[1] += start_y;
+			case 'T':
+				a_x += a_x - start_x;
+				a_y += a_y - start_y;
+				draw_quadratic_bezier(start_x, start_y, a_x, a_y, arguments[0], arguments[1]);
+				start_x = arguments[0];
+				start_y = arguments[1];
+			break;
+			case 'c':
+				arguments[0] += start_x;
+				arguments[1] += start_y;
+				arguments[2] += start_x;
+				arguments[3] += start_y;
+				arguments[4] += start_x;
+				arguments[5] += start_y;
+			case 'C':
+				draw_cubic_bezier(start_x, start_y, arguments[0], arguments[1], arguments[2], arguments[3], arguments[4], arguments[5]);
+				a_x = arguments[2];
+				a_y = arguments[3];
+				start_x = arguments[4];
+				start_y = arguments[5];
+			break;
+			case 's':
+				arguments[0] += start_x;
+				arguments[1] += start_y;
+				arguments[2] += start_x;
+				arguments[3] += start_y;
+			case 'S':
+				a_x += a_x - start_x;
+				a_y += a_y - start_y;
+				draw_cubic_bezier(start_x, start_y, a_x, a_y, arguments[0], arguments[1], arguments[2], arguments[3]);
+				start_x = arguments[2];
+				start_y = arguments[3];
+			break;
+			case 'a':
+			case 'A':
+				Serial.println("Arc!");
+			break;
+			case 'e':
+			case 'E':
+				return;
+			break;
+			default:
+				Serial.println("Path error!");
+				return;
+			break;
+		}
+	}
 }
 
 void test() {
@@ -296,12 +424,10 @@ void loop() {
 	while(digitalRead(BUTTON_PIN));
 	switch (index++) {
 		case 0:
-			draw_path(0, 400, 2);
-			draw_cloud();
+			draw_path(0, 400, 3);
 		break;
 		case 1:
-			draw_path(400, 300, 1.5);
-			draw_skull();
+			// draw_path(400, 300, 1.5);
 		break;
 		default:
 			index = 0;
@@ -362,3 +488,29 @@ void loop() {
 	while (*text)
 		x += draw_char(x, y, *text++, scale) + 1;
 }*/
+
+/*
+void draw_start(int16_t x0, int16_t y0) {
+	go_to(x0, y0);
+	draw_last_x = x0;
+	draw_last_y = y0;
+}
+
+void draw_line(int16_t x1, int16_t y1) {
+	draw_line(draw_last_x, draw_last_y, x1, y1);
+	draw_last_x = x1;
+	draw_last_y = y1;
+}
+
+void draw_quadratic_bezier(int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
+	draw_quadratic_bezier(draw_last_x, draw_last_y,  x1,  y1,  x2,  y2);
+	draw_last_x = x2;
+	draw_last_y = y2;
+}
+
+void draw_cubic_bezier(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3) {
+	draw_cubic_bezier(draw_last_x, draw_last_y,  x1,  y1,  x2,  y2,  x3,  y3);
+	draw_last_x = x3;
+	draw_last_y = y3;
+}
+*/

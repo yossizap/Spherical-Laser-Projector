@@ -18,6 +18,7 @@ SVG_PATH_COMMANDS = {
     "q": 4,
     "t": 2,
     "c": 6,
+    "s": 4,
     "a": 7,
 }
 
