@@ -264,8 +264,8 @@ if "__main__" == __name__:
     parser = OptionParser()
     parser.add_option("-i", "--input_file", dest="input_file", help="SVG input file")
     parser.add_option("-o", "--output_file", dest="output_file", help="Generated code output file path")
-    parser.add_option("-c", "--close_svg", dest="close", action="store_false", 
-        default=True, help="Whether the script should add a line to the starting point when reaching the 'z' instruction(Default=True)")
+    parser.add_option("-c", "--close_svg", dest="close", action="store_true", 
+        default=False, help="Whether the script should add a line to the starting point when reaching the 'z' instruction(Default=False)")
     parser.add_option("-f", "--generate_funcs", dest="generate_funcs", action="store_true", 
         default=False, help="Whether the script should generate the code as function calls instead of an array(Default=False)")
     
