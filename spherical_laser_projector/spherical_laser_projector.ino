@@ -34,9 +34,9 @@
 
 #define CORNER_DEG					(1010)
 #define X_AXIS_LIMIT_MIN			(-CORNER_DEG)
-#define Y_AXIS_LIMIT_MIN			(-1900)
+#define Y_AXIS_LIMIT_MIN			(-2400)
 #define X_AXIS_LIMIT_MAX			(CORNER_DEG * 2)
-#define Y_AXIS_LIMIT_MAX			(1900)
+#define Y_AXIS_LIMIT_MAX			(2400)
 
 #define SERIAL_BAUDRATE				(115200)
 #define SERIAL_BUFFER_SIZE			(60)
@@ -434,13 +434,13 @@ void loop() {
 			// draw_path(SVGS_CHROME_1_PATH, 0, 700, 2.2);
 		break;
 		case 1:
-			draw_path(SVGS_CLOUD_2_PATH, -1200, 700, 2.2);
+			draw_path(SVGS_MENORAH_1_PATH, 700, 700, 2.0);
 		break;
 		case 2:
-			draw_path(SVGS_CLOUD_3_PATH, -800, 700, 2.2);
+			draw_path(SVGS_CLOUD_3_PATH, -1000, 700, 2.2);
 		break;
 		case 3:
-			draw_path(SVGS_CLOUD_4_PATH, -650, 700, 2.2);
+			draw_path(SVGS_CLOUD_4_PATH, -700, 700, 2.2);
 		break;
 		case 4:
 			draw_path(SVGS_DROP_1_PATH, -400, 700, 1.5);
@@ -467,13 +467,13 @@ void loop() {
 			draw_path(SVGS_MAN_1_PATH, 300, 700, 2.2);
 		break;
 		case 11:
-			draw_path(SVGS_LIGHTNING_2_PATH, 750, 700, 2.2);
+			draw_path(SVGS_LIGHTNING_2_PATH, 600, 700, 2.2);
 		break;
 		case 12:
 			draw_path(SVGS_LIGHTNING_1_PATH, 900, 700, 2.2);
 		break;
 		case 13:
-			draw_path(SVGS_MENORAH_1_PATH, 1150, 700, 2.0);
+			draw_path(SVGS_CLOUD_2_PATH, 1150, 700, 2.2);
 		break;
 		case 14:
 			return;
