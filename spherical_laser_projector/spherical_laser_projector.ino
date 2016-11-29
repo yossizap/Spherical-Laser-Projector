@@ -28,22 +28,22 @@
 |	                                                                           |
 \******************************************************************************/
 #include <math.h>					// asin
-#include "paths/cloud.h"
-// #include "paths/skull.h"
+// #include "paths/cloud.h"
+#include "paths/paths.h"
 
 
 #define CORNER_DEG					(1010)
 #define X_AXIS_LIMIT_MIN			(-CORNER_DEG)
-#define Y_AXIS_LIMIT_MIN			(-1500)
+#define Y_AXIS_LIMIT_MIN			(-1900)
 #define X_AXIS_LIMIT_MAX			(CORNER_DEG * 2)
-#define Y_AXIS_LIMIT_MAX			(1500)
+#define Y_AXIS_LIMIT_MAX			(1900)
 
 #define SERIAL_BAUDRATE				(115200)
 #define SERIAL_BUFFER_SIZE			(60)
 #define STEPS_DELAY_MS				(4)
 #define BEZIER_SEGMENTS				(30)
 #define STEPS_PER_RADIAN			(648.68)
-#define Z_SQARE						(10000) // 19600
+#define Z_SQARE						(10000) // 19700
 
 #define X_AXIS_A_PIN				(4)
 #define X_AXIS_B_PIN				(5)
@@ -153,12 +153,13 @@ void relative_steps(int16_t x, int16_t y) {
 }
 
 /* go to the given axes position from current motors position */
-void absolute_steps(int16_t x, int16_t y) {
-	if (x < X_AXIS_LIMIT_MIN) return;
-	if (x > X_AXIS_LIMIT_MAX) return;
-	if (y < Y_AXIS_LIMIT_MIN) return;
-	if (y > Y_AXIS_LIMIT_MAX) return;
+bool absolute_steps(int16_t x, int16_t y) {
+	if (x < X_AXIS_LIMIT_MIN) return true;
+	if (x > X_AXIS_LIMIT_MAX) return true;
+	if (y < Y_AXIS_LIMIT_MIN) return true;
+	if (y > Y_AXIS_LIMIT_MAX) return true;
 	relative_steps(x - current_position_x, y - current_position_y);
+	return false;
 }
 
 /* convert absolute point to absolute axes steps */
@@ -183,7 +184,8 @@ void go_home() {
 }
 
 void go_to(int16_t x, int16_t y) {
-	absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y);
+	if (absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y))
+		Serial.println("Point out of range!");
 	// absolute_point(x * draw_scale + draw_x, y * draw_scale + draw_y);
 }
 
@@ -241,18 +243,16 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 	}
 }
 
-void draw_path(int16_t x, int16_t y, double scale) {
+void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 	uint8_t command;
 	uint8_t arguments_count;
-	uint16_t start_x, start_y, a_x, a_y, b_x, b_y;
+	uint16_t start_x = 0, start_y = 0, a_x, a_y, b_x, b_y;
 	uint16_t m_x = 0, m_y = 0;
 	uint16_t arguments[7];
 
 	draw_x = x;
 	draw_y = y;
 	draw_scale = scale;
-
-	PGM_P path = CLOUD_PATH;
 
 	for (;;) {
 		command = pgm_read_byte(path++);
@@ -279,8 +279,11 @@ void draw_path(int16_t x, int16_t y, double scale) {
 
 		switch (command) {
 			case 'm':
+				arguments[0] += start_x;
+				arguments[1] += start_y;
 			case 'M':
-				set_laser(false);
+				if (start_x != arguments[0] || start_y != arguments[1])
+					set_laser(false);
 				m_x = arguments[0];
 				m_y = arguments[1];
 				start_x = m_x;
@@ -366,9 +369,12 @@ void draw_path(int16_t x, int16_t y, double scale) {
 			break;
 			case 'e':
 			case 'E':
+				set_laser(false);
+				Serial.println("Path end!");
 				return;
 			break;
 			default:
+				set_laser(false);
 				Serial.println("Path error!");
 				return;
 			break;
@@ -386,11 +392,11 @@ void test() {
 	delay(3000);
 	go_home();*/
 	/*
-	for (uint16_t i = 0; i < 1500; i++)
+	for (uint16_t i = 0; i < 1700; i++)
 		relative_steps(0, 1);
 	delay(3000);
 	go_home();
-	for (uint16_t i = 0; i < 1500; i++)
+	for (uint16_t i = 0; i < 1700; i++)
 		relative_steps(0, -1);
 	delay(3000);
 	go_home();*/
@@ -424,13 +430,62 @@ void loop() {
 	while(digitalRead(BUTTON_PIN));
 	switch (index++) {
 		case 0:
-			draw_path(0, 400, 3);
+			return;
+			// draw_path(SVGS_CHROME_1_PATH, 0, 700, 2.2);
 		break;
 		case 1:
-			// draw_path(400, 300, 1.5);
+			draw_path(SVGS_CLOUD_2_PATH, -1200, 700, 2.2);
+		break;
+		case 2:
+			draw_path(SVGS_CLOUD_3_PATH, -800, 700, 2.2);
+		break;
+		case 3:
+			draw_path(SVGS_CLOUD_4_PATH, -650, 700, 2.2);
+		break;
+		case 4:
+			draw_path(SVGS_DROP_1_PATH, -400, 700, 1.5);
+		break;
+		case 5:
+			return;
+			// draw_path(SVGS_ELECTRONICS_1_PATH, 0, 700, 2.2);
+		break;
+		case 6:
+			draw_path(SVGS_FACE_1_PATH, -200, 700, 2.2);
+		break;
+		case 7:
+			return;
+			// draw_path(SVGS_FLOWER_1_PATH, 0, 700, 2.2);
+		break;
+		case 8:
+			draw_path(SVGS_GIRL_1_PATH, 100, 700, 2.2);
+		break;
+		case 9:
+			return;
+			// draw_path(SVGS_GIRL_2_PATH, 900, 700, 2.7);
+		break;
+		case 10:
+			draw_path(SVGS_MAN_1_PATH, 300, 700, 2.2);
+		break;
+		case 11:
+			draw_path(SVGS_LIGHTNING_2_PATH, 750, 700, 2.2);
+		break;
+		case 12:
+			draw_path(SVGS_LIGHTNING_1_PATH, 900, 700, 2.2);
+		break;
+		case 13:
+			draw_path(SVGS_MENORAH_1_PATH, 1150, 700, 2.0);
+		break;
+		case 14:
+			return;
+			// draw_path(SVGS_SKULL_1_PATH, 0, 700, 2.0);
+		break;
+		case 15:
+			return;
+			// draw_path(SVGS_SOL_KEY_1_PATH, 0, 700, 2.2);
 		break;
 		default:
 			index = 0;
+			return;
 		break;
 	}
 	go_home();
