@@ -420,7 +420,7 @@ void setup() {
 
 #define X_POS (700)
 #define Y_POS (700)
-#define SCALE (1.2)
+#define SCALE (1.5)
 
 /* called repeatedly after "setup" */
 void loop() {
@@ -428,49 +428,43 @@ void loop() {
 	while(digitalRead(BUTTON_PIN));
 	switch (index++) {
 		case 0:
-			draw_path(SVGS_MENORAH_1_PATH, 700, 700, 2.0);
+			draw_path(SVGS_BATMAN_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 1:
-			draw_path(SVGS_APPLE_1_PATH, X_POS, Y_POS, SCALE);
+			draw_path(SVGS_CHESS_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 2:
-			draw_path(SVGS_BALL_1_PATH, X_POS, Y_POS, SCALE);
+			draw_path(SVGS_HART_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 3:
-			draw_path(SVGS_CAMLE_1_PATH, X_POS, Y_POS, SCALE);
+			draw_path(SVGS_MENORAH_1_PATH, 700, 700, 2.0);
 		break;
 		case 4:
-			draw_path(SVGS_CLOUD_1_PATH, X_POS, Y_POS, SCALE);
+			draw_path(SVGS_BALL_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 5:
-			draw_path(SVGS_CLOUD_2_PATH, X_POS, Y_POS, SCALE);
+			draw_path(SVGS_CAMLE_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 6:
 			draw_path(SVGS_COW_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 7:
-			draw_path(SVGS_GIRL_1_PATH, X_POS, Y_POS, SCALE);
-			draw_path(SVGS_MAN_1_PATH, X_POS + 100, Y_POS, SCALE);
-		break;
-		case 8:
-			draw_path(SVGS_LAMP_1_PATH, X_POS, Y_POS, SCALE);
-		break;
-		case 9:
-			draw_path(SVGS_LIGHTNING_1_PATH, X_POS, Y_POS, SCALE);
-			draw_path(SVGS_LIGHTNING_2_PATH, X_POS + 250, Y_POS, SCALE);
-		break;
-		case 10:
 			draw_path(SVGS_PRESENT_1_PATH, X_POS, Y_POS, SCALE);
 		break;
-		case 11:
-			draw_path(SVGS_RECYCLE_1_PATH, X_POS, Y_POS, SCALE);
-		break;
-		case 12:
+		case 8:
 			draw_path(SVGS_YENG_YANG_1_PATH, X_POS, Y_POS, SCALE);
 		break;
-		case 13:
+		case 9:
 			index = 0;
 			return;
+		break;
+		case 10:
+		break;
+		case 11:
+		break;
+		case 12:
+		break;
+		case 13:
 		break;
 		case 14:
 		break;
