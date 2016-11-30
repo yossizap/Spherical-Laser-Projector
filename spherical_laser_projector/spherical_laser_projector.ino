@@ -29,7 +29,7 @@
 \******************************************************************************/
 #include <math.h>					// asin
 // #include "paths/cloud.h"
-#include "paths/paths.h"
+#include "paths2/paths.h"
 
 
 #define CORNER_DEG					(1010)
@@ -247,9 +247,9 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 	uint8_t command;
 	uint8_t arguments_count;
-	uint16_t start_x = 0, start_y = 0, a_x, a_y;
-	uint16_t m_x = 0, m_y = 0;
-	uint16_t arguments[7];
+	int16_t start_x = 0, start_y = 0, a_x, a_y;
+	int16_t m_x = 0, m_y = 0;
+	int16_t arguments[7];
 
 	draw_x = x;
 	draw_y = y;
@@ -418,64 +418,63 @@ void setup() {
 	// set_laser(true); delay(100); set_laser(false);
 }
 
+#define X_POS (700)
+#define Y_POS (700)
+#define SCALE (1.2)
+
 /* called repeatedly after "setup" */
 void loop() {
 	static uint8_t index = 0;
 	while(digitalRead(BUTTON_PIN));
 	switch (index++) {
 		case 0:
-			return;
-			// draw_path(SVGS_CHROME_1_PATH, 0, 700, 2.2);
-		break;
-		case 1:
 			draw_path(SVGS_MENORAH_1_PATH, 700, 700, 2.0);
 		break;
+		case 1:
+			draw_path(SVGS_APPLE_1_PATH, X_POS, Y_POS, SCALE);
+		break;
 		case 2:
-			draw_path(SVGS_CLOUD_3_PATH, -1000, 700, 2.2);
+			draw_path(SVGS_BALL_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 3:
-			draw_path(SVGS_CLOUD_4_PATH, -700, 700, 2.2);
+			draw_path(SVGS_CAMLE_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 4:
-			draw_path(SVGS_DROP_1_PATH, -400, 700, 1.5);
+			draw_path(SVGS_CLOUD_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 5:
-			return;
-			// draw_path(SVGS_ELECTRONICS_1_PATH, 0, 700, 2.2);
+			draw_path(SVGS_CLOUD_2_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 6:
-			draw_path(SVGS_FACE_1_PATH, -200, 700, 2.2);
+			draw_path(SVGS_COW_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 7:
-			return;
-			// draw_path(SVGS_FLOWER_1_PATH, 0, 700, 2.2);
+			draw_path(SVGS_GIRL_1_PATH, X_POS, Y_POS, SCALE);
+			draw_path(SVGS_MAN_1_PATH, X_POS + 100, Y_POS, SCALE);
 		break;
 		case 8:
-			draw_path(SVGS_GIRL_1_PATH, 100, 700, 2.2);
+			draw_path(SVGS_LAMP_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 9:
-			return;
-			// draw_path(SVGS_GIRL_2_PATH, 900, 700, 2.7);
+			draw_path(SVGS_LIGHTNING_1_PATH, X_POS, Y_POS, SCALE);
+			draw_path(SVGS_LIGHTNING_2_PATH, X_POS + 250, Y_POS, SCALE);
 		break;
 		case 10:
-			draw_path(SVGS_MAN_1_PATH, 300, 700, 2.2);
+			draw_path(SVGS_PRESENT_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 11:
-			draw_path(SVGS_LIGHTNING_2_PATH, 600, 700, 2.2);
+			draw_path(SVGS_RECYCLE_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 12:
-			draw_path(SVGS_LIGHTNING_1_PATH, 900, 700, 2.2);
+			draw_path(SVGS_YENG_YANG_1_PATH, X_POS, Y_POS, SCALE);
 		break;
 		case 13:
-			draw_path(SVGS_CLOUD_2_PATH, 1150, 700, 2.2);
+			index = 0;
+			return;
 		break;
 		case 14:
-			return;
-			// draw_path(SVGS_SKULL_1_PATH, 0, 700, 2.0);
 		break;
 		case 15:
-			return;
-			// draw_path(SVGS_SOL_KEY_1_PATH, 0, 700, 2.2);
 		break;
 		default:
 			index = 0;
