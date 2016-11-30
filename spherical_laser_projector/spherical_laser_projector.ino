@@ -60,6 +60,7 @@
 
 // const uint8_t STEPS_MASKS[] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
 const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0b0011, 0b0001};
+// const uint8_t PATH_COMMAND_ARGUMENTS[] = {2,1,1,2,0,4,2,6,4,7,2,1,1,2,0,4,2,6,4,7,0};
 const uint8_t PATH_COMMAND_ARGUMENTS[] = {
 	'm', 2,
 	'h', 1,
@@ -246,7 +247,7 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 	uint8_t command;
 	uint8_t arguments_count;
-	uint16_t start_x = 0, start_y = 0, a_x, a_y, b_x, b_y;
+	uint16_t start_x = 0, start_y = 0, a_x, a_y;
 	uint16_t m_x = 0, m_y = 0;
 	uint16_t arguments[7];
 
@@ -415,13 +416,6 @@ void setup() {
 	// -Y is left
 	// relative_steps(20, 0); set_home();
 	// set_laser(true); delay(100); set_laser(false);
-	
-	// draw_path(0, -180, 3);
-	// draw_path(-20, 50, 0.5);
-	// draw_cloud();
-	// test();
-	// draw_skull();
-	go_home();
 }
 
 /* called repeatedly after "setup" */

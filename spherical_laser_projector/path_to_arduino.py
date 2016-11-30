@@ -5,21 +5,10 @@ import xml.etree.ElementTree as ElementTree
 
 
 ROUNDING_MULTIPLIER = 1
-ARDUINO_END_COMMAND = "e"
 SVG_POINT_SEPARATOR = ","
-SVG_PATH_COMMANDS = {
-    "m": 2,
-    "h": 1,
-    "v": 1,
-    "l": 2,
-    "z": 0,
-    "q": 4,
-    "t": 2,
-    "c": 6,
-    "s": 4,
-    "a": 7,
-}
+SVG_PATH_COMMANDS = "mhvlzqtcsaMHVLZQTCSA"
 SVG_XML_NAMESPACE = "http://www.w3.org/2000/svg"
+PATH_END_COMMAND = "e"
 
 FILE_FORMAT = \
 """static const uint8_t %s[] PROGMEM = {
@@ -34,22 +23,12 @@ def parse_svg_number_to_data(number):
 
 def parse_svg_path(path):
     path = path.replace(SVG_POINT_SEPARATOR, " ")
-    commands = "".join(SVG_PATH_COMMANDS.keys())
-    commands += commands.upper()
 
-    for command in commands:
+    for command in SVG_PATH_COMMANDS:
         path = path.replace(command, " %s " % (command,))
 
-    return "".join([i if i in commands else parse_svg_number_to_data(float(i)) for i in path.strip().split(" ")])
-
-def main():
-    data = parse_svg_path(SVG_PATH)
-    data += ARDUINO_END_COMMAND
-
-    with open(os.path.join(os.path.dirname(os.path.sys.argv[0]), "%s.h" % (PATH_NAME,)), "wb") as f:
-        f.write(FILE_FORMAT % (
-            "%s_PATH" % (PATH_NAME.upper(),),
-            ",".join(["0x%02X" % (ord(i),) for i in data])))
+    return "".join([i if i in SVG_PATH_COMMANDS else parse_svg_number_to_data(float(i))
+        for i in path.strip().split(" ")])
 
 def convert_image_to_bitmap(image_path, bitmap_path, bitmap_name, append=False):
     paths = []
@@ -61,7 +40,7 @@ def convert_image_to_bitmap(image_path, bitmap_path, bitmap_name, append=False):
         paths.append(node.attrib["d"])
 
     data = parse_svg_path("".join(paths))
-    data += ARDUINO_END_COMMAND
+    data += PATH_END_COMMAND
 
     with open(bitmap_path, "a+" if append else "wb") as f:
         f.write(FILE_FORMAT % (
