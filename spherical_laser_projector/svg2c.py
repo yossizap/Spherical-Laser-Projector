@@ -27,9 +27,25 @@ QUADRATIC_BEZIER_INSTRUCTION =  hex(ord("q"))
 ARC_INSTRUCTION =  hex(ord("a"))
 DRAW_START_INSTRUCTION =  hex(ord("m"))
 
-def generate_function_calls(paths, close=True):
+# Format string for array and function arguments generation
+LINE_FORMAT = "{0}, {1}" # {XEND}, {YEND}
+QUADRATIC_BEZIER_FORMAT = "{0}, {1}, {2}, {3}" # {XCNT}, {YCNT}, {XEND}, {YEND}
+ARC_FORMAT = "{0}, {1}, {2}, {3}, {4}, {5}, {6}" # {XRADIUS}, {YRADIUS}, {ROTATION}, {ARC}, {SWEEP}, {XEND}, {YEND}
+CUBIC_BEZIER_FORMAT = "{0}, {1}, {2}, {3}, {4}, {5}" # {XCNT1}, {YCNT1}, {XCNT2}, {YCNT2}, {XEND}, {YEND}
+DRAW_START_FORMAT = "{0}, {1}" # {XSTART, YSTART}
+
+# function externs
+g_externs = "extern void %s(int16_t x1, int16_t y1);\n" % DRAW_START_FUNC_NAME
+g_externs += "extern void %s(bool is_on);\n" % SET_LASER_FUNC_NAME
+g_externs += "extern void %s(int16_t x1, int16_t y1);\n" % LINE_FUNC_NAME
+g_externs += "extern void %s(int16_t x1, int16_t y1, int16_t x2, int16_t y2);\n" % QUADRATIC_BEZIER_FUNC_NAME
+g_externs += "extern void %s(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3);\n" % CUBIC_BEZIER_FUNC_NAME
+g_externs += "extern void %s(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t arc, int16_t sweep, int16_t x1, int16_t y1) ;\n" % ARC_FUNC_NAME
+
+def generate_code(paths, close=True, gen_funcs=False):
     '''
-    Return a string that contains the generated function calls from the given paths list
+    Return a string that contains a generated code from the given paths. An array is created if 'gen_funcs' isn't True,
+    otherwise function calls are generated.
     '''
     gen_code = ""
     instructions_counter = 0
@@ -42,172 +58,122 @@ def generate_function_calls(paths, close=True):
     # function calls
     for path in paths:
         for instruction in svg.path.parse_path(path):
-            # Log the first instruction's location to return to it when "close" is True. 
-            # NOTE: It might wiser to place this for the first path and do the closing on the last path. Requires testing.
-            instructions_counter += 1
-            if 1 == instructions_counter:
-                start_x = instruction.start.real
-                start_y = instruction.start.imag
+            # Log the first instruction's location to return to it when "close" is True.
+            if True == close:
+                instructions_counter += 1
+                if 1 == instructions_counter:
+                    start_x = instruction.start.real
+                    start_y = instruction.start.imag
             
             # Only move the cursor to the start point if the start x or y are different from the previous end points
             if end_x != round_float(instruction.start.real) or end_y != round_float(instruction.start.imag):
-                gen_code += create_function_call(DRAW_START_FUNC_NAME,
-                    "{XSTART}, {YSTART}".format(
-                        XSTART=round_float(instruction.control1.real), 
-                        YSTART=round_float(instruction.control1.imag),)
-                    )
+                gen_code += create_path_command(gen_funcs,
+                    DRAW_START_FUNC_NAME,
+                    DRAW_START_FORMAT,
+                    DRAW_START_INSTRUCTION,
+                    instruction.start.real, 
+                    instruction.start.imag)
                     
             # Put the end points aside for the next iteration
             end_x = round_float(instruction.end.real)
             end_y = round_float(instruction.end.imag)
                 
             if isinstance(instruction, svg.path.QuadraticBezier):
-                gen_code += create_function_call(QUADRATIC_BEZIER_FUNC_NAME,
-                    "{XCNT}, {YCNT}, {XEND}, {YEND}".format(
-                        XCNT=round_float(instruction.control1.real), 
-                        YCNT=round_float(instruction.control1.imag), 
-                        XEND=round_float(instruction.end.real), 
-                        YEND=round_float(instruction.end.imag),),
-                    )
+                gen_code += create_path_command(gen_funcs,
+                    QUADRATIC_BEZIER_FUNC_NAME,
+                    QUADRATIC_BEZIER_FORMAT,
+                    QUADRATIC_BEZIER_INSTRUCTION,
+                    instruction.control1.real, 
+                    instruction.control1.imag, 
+                    instruction.end.real, 
+                    instruction.end.imag,)
                     
             elif isinstance(instruction, svg.path.Line):
-                gen_code += create_function_call(LINE_FUNC_NAME, 
-                    "{XEND}, {YEND}".format(
-                        XEND=round_float(instruction.end.real), 
-                        YEND=round_float(instruction.end.imag),),
-                    )
+                gen_code += create_path_command(gen_funcs,
+                    LINE_FUNC_NAME, 
+                    LINE_FORMAT,
+                    LINE_INSTRUCTION,
+                    instruction.end.real, 
+                    instruction.end.imag,)
                     
             elif isinstance(instruction, svg.path.CubicBezier):
-                gen_code += create_function_call(CUBIC_BEZIER_FUNC_NAME,
-                    "{XCNT1}, {YCNT1}, {XCNT2}, {YCNT2}, {XEND}, {YEND}".format(
-                        XCNT1=round_float(instruction.control1.real), 
-                        YCNT1=round_float(instruction.control1.imag), 
-                        XCNT2=round_float(instruction.control2.real), 
-                        YCNT2=round_float(instruction.control2.imag), 
-                        XEND=round_float(instruction.end.real), 
-                        YEND=round_float(instruction.end.imag),),
-                    )
+                gen_code += create_path_command(gen_funcs,
+                    CUBIC_BEZIER_FUNC_NAME,
+                    CUBIC_BEZIER_FORMAT,
+                    CUBIC_BEZIER_INSTRUCTION,
+                    instruction.control1.real, 
+                    instruction.control1.imag, 
+                    instruction.control2.real, 
+                    instruction.control2.imag, 
+                    instruction.end.real, 
+                    instruction.end.imag,)
                     
             elif isinstance(instruction, svg.path.Arc):
-                gen_code += create_function_call(ARC_FUNC_NAME, 
-                    "{XRADIUS}, {YRADIUS}, {ROTATION}, {ARC}, {SWEEP}, {XEND}, {YEND}".format(
-                        XRADIUS=round_float(instruction.radius.real), 
-                        YRADIUS=round_float(instruction.radius.imag),
-                        ROTATION=round_float(instruction.rotation),
-                        ARC=str(instruction.arc).lower(), 
-                        SWEEP=str(instruction.arc).lower(),
-                        XEND=round_float(instruction.end.real), 
-                        YEND=round_float(instruction.end.imag),),
-                    )
+                gen_code += create_path_command(gen_funcs,
+                    ARC_FUNC_NAME, 
+                    ARC_FORMAT,
+                    ARC_INSTRUCTION,
+                    instruction.radius.real, 
+                    instruction.radius.imag,
+                    instruction.rotation,
+                    str(instruction.arc).lower(), 
+                    str(instruction.arc).lower(),
+                    instruction.end.real, 
+                    instruction.end.imag,)
                         
         # If close is enabled we have to draw a line back to the starting position from this instruction's end position
         # in case the 'z' instruction wasn't in the path.
         if True == close and False == path.closed:
-            gen_code += create_function_call(LINE_FUNC_NAME,
-                "{XEND}, {YEND}".format(
-                    XEND=round_float(start_x), 
-                    YEND=round_float(start_y),),
-                )
+            gen_code += create_path_command(gen_funcs,
+                LINE_FUNC_NAME,
+                LINE_FORMAT,
+                start_x, 
+                start_y,)
+            instructions_counter = 0
             
-        # Turn off the laser once a path is finished
+    # Turn off the laser and return to 0,0 once all the paths were drawn
+    if True == gen_funcs:
         gen_code += create_function_call(SET_LASER_FUNC_NAME, "false")
+    else:
+        gen_code += ARDUINO_END_COMMAND
         
     return gen_code
-
     
-def generate_path_array(paths, close=True):
-    '''
-    Return a string that contains the generated path instructions array
-    '''
-    gen_code = ""
-    instructions_counter = 0
-    start_x = None
-    start_y = None
-    end_x = None
-    end_y = None
-    
-    # Go over all the paths in the paths list, parse them as svg.path classes and convert them to
-    # function calls
-    for path in paths:
-        for instruction in svg.path.parse_path(path):
-            # Log the first instruction's location to return to it when "close" is True. 
-            # NOTE: It might wiser to place this for the first path and do the closing on the last path. Requires testing.
-            instructions_counter += 1
-            if 1 == instructions_counter:
-                start_x = instruction.start.real
-                start_y = instruction.start.imag
-            
-            # Only move the cursor to the start point if the start x or y are different from the previous end points
-            if end_x != round_float(instruction.start.real) or end_y != round_float(instruction.start.imag):
-                gen_code += "{INS}, {XSTART}, {YSTART},\n".format(
-                        INS=DRAW_START_INSTRUCTION,
-                        XSTART=serialize_float(instruction.control1.real), 
-                        YSTART=serialize_float(instruction.control1.imag),)
-                    
-            # Put the end points aside for the next iteration
-            end_x = round_float(instruction.end.real)
-            end_y = round_float(instruction.end.imag)
-                
-            if isinstance(instruction, svg.path.QuadraticBezier):
-                gen_code += "{INS}, {XCNT}, {YCNT}, {XEND}, {YEND},\n".format(
-                        INS=QUADRATIC_BEZIER_INSTRUCTION,
-                        XCNT=serialize_float(instruction.control1.real), 
-                        YCNT=serialize_float(instruction.control1.imag), 
-                        XEND=serialize_float(instruction.end.real), 
-                        YEND=serialize_float(instruction.end.imag),)
-                    
-            elif isinstance(instruction, svg.path.Line):
-                gen_code += "{INS}, {XEND}, {YEND},\n".format(
-                        INS=LINE_INSTRUCTION,
-                        XEND=serialize_float(instruction.end.real), 
-                        YEND=serialize_float(instruction.end.imag),)
-                    
-            elif isinstance(instruction, svg.path.CubicBezier):
-                gen_code += "{INS}, {XCNT1}, {YCNT1}, {XCNT2}, {YCNT2}, {XEND}, {YEND},\n".format(
-                        INS=CUBIC_BEZIER_INSTRUCTION,
-                        XCNT1=serialize_float(instruction.control1.real), 
-                        YCNT1=serialize_float(instruction.control1.imag), 
-                        XCNT2=serialize_float(instruction.control2.real), 
-                        YCNT2=serialize_float(instruction.control2.imag), 
-                        XEND=serialize_float(instruction.end.real), 
-                        YEND=serialize_float(instruction.end.imag),)
-                    
-            elif isinstance(instruction, svg.path.Arc):
-                gen_code += "{INS}, {XRADIUS}, {YRADIUS}, {ROTATION}, {ARC}, {SWEEP}, {XEND}, {YEND},\n".format(
-                        INS=ARC_INSTRUCTION,
-                        XRADIUS=serialize_float(instruction.radius.real), 
-                        YRADIUS=serialize_float(instruction.radius.imag),
-                        ROTATION=serialize_float(instruction.rotation),
-                        ARC=str(instruction.arc).lower(), 
-                        SWEEP=str(instruction.arc).lower(),
-                        XEND=serialize_float(instruction.end.real), 
-                        YEND=serialize_float(instruction.end.imag),)
-                        
-        # If close is enabled we have to draw a line back to the starting position from this instruction's end position
-        # in case the 'z' instruction wasn't in the path.
-        if True == close and False == svg.path.parse_path(path).closed:
-            gen_code += "{INS}, {XEND}, {YEND},\n".format(
-                    INS=LINE_INSTRUCTION,
-                    XEND=serialize_float(start_x), 
-                    YEND=serialize_float(start_y),)
-            
-    # Turn off the laser once a path is finished
-    gen_code += ARDUINO_END_COMMAND
-        
-    return gen_code
     
 def serialize_float(number):
     '''
-    Serialize a given float into as int16_t
+    Serialize a given float as int16_t
     '''
     return ", ".join(["0x%02X" % (ord(i),) for i in struct.pack("<h", round_float(number))])
 
-
+    
 def round_float(number):
     return int(round(number * ROUNDING_MULTIPLIER))
 
-
-def create_function_call(func_name, arguments):
+    
+def create_path_command(gen_funcs, func_name, format, instruction, *args):
+    '''
+    Creates a path command
+    '''
+    func_variables = []
+    array_variables = []
+    for arg in args:
+        if isinstance(arg, float):
+            func_variables.append(round_float(arg))
+            array_variables.append(serialize_float(arg))
+        else:
+            func_variables.append(arg)
+            array_variables.append(arg)
+            
+    function_call = create_function_call(func_name, format.format(*func_variables))
+    if True == gen_funcs:
+        return function_call 
+    
+    array_instruction = instruction + ', ' + format.format(*array_variables) + ' // ' + function_call
+    return array_instruction
+    
+    
+def create_function_call(func_name, arguments, ):
     '''
     Creates a C function call string from a function name and arguments
     '''
@@ -233,33 +199,33 @@ def create_function_wrapper(func_name, func_content):
     '''
     Creates a function that wraps a given code block with the given name
     '''
-    indent = "\t"
-    indented_code = ''.join(indent+line for line in func_content.splitlines(True))
-    
-    wrapper = "extern void %s(int16_t x1, int16_t y1);\n)" % DRAW_START_FUNC_NAME
-    wrapper += "extern void %s(bool is_on);\n" % SET_LASER_FUNC_NAME
-    wrapper += "extern void %s(int16_t x1, int16_t y1);\n" % LINE_FUNC_NAME
-    wrapper += "extern void %s(int16_t x1, int16_t y1, int16_t x2, int16_t y2);\n" % QUADRATIC_BEZIER_FUNC_NAME
-    wrapper += "extern void %s(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3);\n" % CUBIC_BEZIER_FUNC_NAME
-    wrapper += "extern void %s(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t arc, int16_t sweep, int16_t x1, int16_t y1) ;\n" % ARC_FUNC_NAME
-    wrapper += "void %s()\n{\n%s}" % (func_name, indented_code)
+    wrapper = g_externs
+    wrapper += "void %s()\n{\n%s}" % (func_name, indent_lines("\t", indented_code))
     return wrapper
+    
+    
+def indent_lines(indent, lines):
+    '''
+    Adds line indent with the given indent string to the given lines
+    '''
+    return ''.join(indent+line for line in lines.splitlines(True))
 
+    
 def create_array_wrapper(array_name, array_content):
     '''
     Creates an array that wraps a given code block with the given name
     '''
-    indent = "\t"
-    indented_code = ''.join(indent+line for line in array_content.splitlines(True))
-    
-    wrapper = "static const uint8_t %s[] PROGMEM = {\n%s\n};" % (array_name, indented_code)
+    wrapper = create_doc(indent_lines("\t", g_externs)) 
+    wrapper += "static const uint8_t %s[] PROGMEM = {\n%s\n};" % (array_name, indent_lines("\t", array_content))
     return wrapper
+    
     
 def create_doc(text):
     '''
     Creates a documentation block with the given text
     '''
-    return "/* " + text + " */\n"
+    return "/*\n" + text + "*/\n"
+    
     
 if "__main__" == __name__:
     parser = OptionParser()
@@ -274,13 +240,12 @@ if "__main__" == __name__:
         
     paths = parse_paths_from_svg(options.input_file)
     
+    code = generate_code(paths, options.close, options.generate_funcs)
     if False == options.generate_funcs:
-        code = generate_path_array(paths, options.close)
         code = create_array_wrapper(os.path.splitext(os.path.basename(options.output_file))[0].upper() + "_PATH", code)
     else:
-        code = generate_function_calls(paths, options.close)
         code = create_function_wrapper("draw_" + os.path.splitext(os.path.basename(options.output_file))[0], code)
     
     with open(("%s.h" % options.output_file), "wb") as f:
-        f.write(create_doc("WARNING: Automatically generated code, do not modify."))
+        f.write(create_doc("WARNING: Automatically generated code, do not modify.\n"))
         f.write(code)

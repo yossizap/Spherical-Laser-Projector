@@ -442,6 +442,7 @@ void loop() {
 			draw_path(SVGS_MENORAH_1_PATH, DEFAULT_X_POS, DEFAULT_Y_POS, DEFAULT_SCALE + 0.2);			
 			break;
 		case 4:
+			draw_path(SVGS_YIN_YANG_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 1.2);
 			break;
 		case 5:
 			draw_path(SVGS_PRESENT_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 0.2);
