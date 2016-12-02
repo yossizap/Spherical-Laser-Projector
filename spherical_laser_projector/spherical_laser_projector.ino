@@ -29,7 +29,7 @@
 \******************************************************************************/
 #include <math.h>					// asin
 // #include "paths/cloud.h"
-#include "paths2/paths.h"
+#include "paths/paths.h"
 
 
 #define CORNER_DEG					(1010)
@@ -418,63 +418,52 @@ void setup() {
 	// set_laser(true); delay(100); set_laser(false);
 }
 
-#define X_POS (700)
-#define Y_POS (700)
-#define SCALE (1.5)
-
+/* Starting positions for the drawings. */
+#define DEFAULT_X_POS (900)
+#define DEFAULT_Y_POS (700)
+#define DEFAULT_SCALE (2.0)
+			
 /* called repeatedly after "setup" */
 void loop() {
 	static uint8_t index = 0;
+    
 	while(digitalRead(BUTTON_PIN));
-	switch (index++) {
+		switch (index++) {
 		case 0:
-			draw_path(SVGS_BATMAN_1_PATH, X_POS, Y_POS, SCALE);
-		break;
+			draw_path(SNOWFLAKE_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.0);
+			break;
 		case 1:
-			draw_path(SVGS_CHESS_1_PATH, X_POS, Y_POS, SCALE);
-		break;
+			draw_path(SVGS_CAMEL_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
+			break;
 		case 2:
-			draw_path(SVGS_HART_1_PATH, X_POS, Y_POS, SCALE);
-		break;
+			draw_path(SVGS_COW_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);	
+			break;			
 		case 3:
-			draw_path(SVGS_MENORAH_1_PATH, 700, 700, 2.0);
-		break;
+			draw_path(SVGS_MENORAH_1_PATH, DEFAULT_X_POS, DEFAULT_Y_POS, DEFAULT_SCALE + 0.2);			
+			break;
 		case 4:
-			draw_path(SVGS_BALL_1_PATH, X_POS, Y_POS, SCALE);
-		break;
+			break;
 		case 5:
-			draw_path(SVGS_CAMLE_1_PATH, X_POS, Y_POS, SCALE);
-		break;
+			draw_path(SVGS_PRESENT_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 0.2);
+			break;
 		case 6:
-			draw_path(SVGS_COW_1_PATH, X_POS, Y_POS, SCALE);
-		break;
+			draw_path(SVGS_BALL_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
+			break;
 		case 7:
-			draw_path(SVGS_PRESENT_1_PATH, X_POS, Y_POS, SCALE);
-		break;
+			draw_path(SVGS_HEART_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
+			break;
 		case 8:
-			draw_path(SVGS_YENG_YANG_1_PATH, X_POS, Y_POS, SCALE);
-		break;
+			draw_path(SVGS_BATMAN_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE 2.2);
+			break;
 		case 9:
 			index = 0;
 			return;
-		break;
-		case 10:
-		break;
-		case 11:
-		break;
-		case 12:
-		break;
-		case 13:
-		break;
-		case 14:
-		break;
-		case 15:
-		break;
 		default:
 			index = 0;
 			return;
 		break;
 	}
+    
 	go_home();
 	delay(1000);
 	while(!digitalRead(BUTTON_PIN));
