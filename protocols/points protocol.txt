@@ -2,8 +2,8 @@ Spherical Laser Projector Points Protocol 1.0:
 
 Represents a path using binary points.
 Each path start with its length little-endian 16 bits, followed by point(s) (8 bits x, 8 bits y).
-All points are relativly to their previous point, the first relatives to (0,0) - left top of path.
-Point (0,0) means turn the laser off, each other point turn the laser on and move the motors x and y steps.
+All points are relative to their previous point, the first relatives to (0,0) - the left top of the path.
+The point (0,0) instucts the laser to turn off, any other point turns the laser on and moves the motors.
 
 examples:
 	draw horizontal line from (4,8) to (6,8)
@@ -12,7 +12,7 @@ examples:
 	draw vertical line from (4,8) to (4,10)
 	"\x00\x02\x04\x08\x00\x02"
 
-	draw rect and 2 diagonal lines - house (0xFC is -4)
+	draw rectangle and 2 diagonal lines - house (0xFC is -4)
 	"\x00\x07\x04\x04\x04\x00\x00\x04\xFC\x00\x00\xFC\x02\xFC\x02\x04"
 
 	draw x

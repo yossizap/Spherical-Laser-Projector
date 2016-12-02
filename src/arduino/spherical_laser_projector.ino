@@ -28,8 +28,7 @@
 |	                                                                           |
 \******************************************************************************/
 #include <math.h>					// asin
-// #include "paths/cloud.h"
-#include "paths/paths.h"
+#include "../gen/paths.h"
 
 
 #define CORNER_DEG					(1010)

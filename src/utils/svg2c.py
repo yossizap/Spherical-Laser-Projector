@@ -40,7 +40,7 @@ g_externs += "extern void %s(bool is_on);\n" % SET_LASER_FUNC_NAME
 g_externs += "extern void %s(int16_t x1, int16_t y1);\n" % LINE_FUNC_NAME
 g_externs += "extern void %s(int16_t x1, int16_t y1, int16_t x2, int16_t y2);\n" % QUADRATIC_BEZIER_FUNC_NAME
 g_externs += "extern void %s(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3);\n" % CUBIC_BEZIER_FUNC_NAME
-g_externs += "extern void %s(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t arc, int16_t sweep, int16_t x1, int16_t y1) ;\n" % ARC_FUNC_NAME
+g_externs += "extern void %s(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t arc, int16_t sweep, int16_t x1, int16_t y1);\n" % ARC_FUNC_NAME
 
 def generate_code(paths, close=True, gen_funcs=False):
     '''
@@ -83,8 +83,8 @@ def generate_code(paths, close=True, gen_funcs=False):
                     QUADRATIC_BEZIER_FUNC_NAME,
                     QUADRATIC_BEZIER_FORMAT,
                     QUADRATIC_BEZIER_INSTRUCTION,
-                    instruction.control1.real, 
-                    instruction.control1.imag, 
+                    instruction.control.real, 
+                    instruction.control.imag, 
                     instruction.end.real, 
                     instruction.end.imag,)
                     
@@ -199,8 +199,7 @@ def create_function_wrapper(func_name, func_content):
     '''
     Creates a function that wraps a given code block with the given name
     '''
-    wrapper = g_externs
-    wrapper += "void %s()\n{\n%s}" % (func_name, indent_lines("\t", indented_code))
+    wrapper = "void %s()\n{\n%s}" % (func_name, indent_lines("\t", func_content))
     return wrapper
     
     
@@ -215,8 +214,7 @@ def create_array_wrapper(array_name, array_content):
     '''
     Creates an array that wraps a given code block with the given name
     '''
-    wrapper = create_doc(indent_lines("\t", g_externs)) 
-    wrapper += "static const uint8_t %s[] PROGMEM = {\n%s\n};" % (array_name, indent_lines("\t", array_content))
+    wrapper = "static const uint8_t %s[] PROGMEM = {\n%s\n};" % (array_name, indent_lines("\t", array_content))
     return wrapper
     
     
@@ -226,10 +224,24 @@ def create_doc(text):
     '''
     return "/*\n" + text + "*/\n"
     
+def generate_code_from_file(file, close, generate_funcs):
+    '''
+    Returns generated code from a given svg file
+    '''
+    paths = parse_paths_from_svg(file)
+    
+    code = generate_code(paths, close, generate_funcs)
+    if False == options.generate_funcs:
+        code = create_array_wrapper(os.path.splitext(os.path.basename(file))[0].upper() + "_PATH", code)
+    else:
+        code = create_function_wrapper("draw_" + os.path.splitext(os.path.basename(file))[0], code)
+    
+    return code
     
 if "__main__" == __name__:
     parser = OptionParser()
     parser.add_option("-i", "--input_file", dest="input_file", help="SVG input file")
+    parser.add_option("-d", "--input_dir", dest="input_dir", help="SVG input directory")
     parser.add_option("-o", "--output_file", dest="output_file", help="Generated code output file path")
     parser.add_option("-c", "--close_svg", dest="close", action="store_true", 
         default=False, help="Whether the script should add a line to the starting point when reaching the 'z' instruction(Default=False)")
@@ -237,15 +249,22 @@ if "__main__" == __name__:
         default=False, help="Whether the script should generate the code as function calls instead of an array(Default=False)")
     
     (options, args) = parser.parse_args()
-        
-    paths = parse_paths_from_svg(options.input_file)
     
-    code = generate_code(paths, options.close, options.generate_funcs)
-    if False == options.generate_funcs:
-        code = create_array_wrapper(os.path.splitext(os.path.basename(options.output_file))[0].upper() + "_PATH", code)
+    code = ""
+    if None != options.input_dir:
+        for file in os.listdir(options.input_dir):
+            if True == file.endswith(".svg"):
+                code += generate_code_from_file(os.path.join(options.input_dir, file), options.close, options.generate_funcs)
+                code += '\n\n'
     else:
-        code = create_function_wrapper("draw_" + os.path.splitext(os.path.basename(options.output_file))[0], code)
-    
+        code += generate_code_from_file(options.input_file, options.close, options.generate_funcs)
+
     with open(("%s.h" % options.output_file), "wb") as f:
         f.write(create_doc("WARNING: Automatically generated code, do not modify.\n"))
+        
+        if False == options.generate_funcs:
+            f.write(create_doc(indent_lines("\t", g_externs)))
+        else:
+            f.write(g_externs)
+            
         f.write(code)
