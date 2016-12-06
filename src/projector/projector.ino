@@ -44,7 +44,7 @@
 #define BEZIER_SEGMENTS				(30)
 // #define STEPS_PER_RADIAN			(648.68)
 // #define Z_SQARE						(10000) // 19700
-#define LAMP_FADE_MS				(100)
+#define LAMP_FADE_MS				(150)
 #define EEPROM_RECORD_ADDRESS		(0)
 #define EEPROM_STATUS_VALID			(0x55)
 // #define EEPROM_STATUS_INVALID		(0xAA)
@@ -54,21 +54,18 @@
 #define X_AXIS_C_PIN				(6)
 #define X_AXIS_D_PIN				(7)
 #define LASER_PIN					(8)
-#define POWER_PIN					(9)
-#define LIGHT_PIN					(10)
 #define BUTTON_PIN					(12)
 #define Y_AXIS_A_PIN				(A0)
 #define Y_AXIS_B_PIN				(A1)
 #define Y_AXIS_C_PIN				(A2)
 #define Y_AXIS_D_PIN				(A3)
 
-#define LASER_MASK					(0x01)
-#define POWER_MASK					(0x02)
-// #define LIGHT_MASK					(0x04)
+#define _PINB_MASK(pin)				(1 << (pin - 8))
+#define LASER_MASK					(_PINB_MASK(LASER_PIN))
 
 // const uint8_t STEPS_MASKS[] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
 const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0b0011, 0b0001};
-const uint8_t LAMP_FADE_PWM[] = {10, 20, 40, 80, 160, 255, 200, 100, 40};
+const uint8_t LAMP_FADE_PWM[] = {5, 10, 20, 40, 80, 130, 180, 220, 255, 200, 100, 40, 10};
 // const uint8_t PATH_COMMAND_ARGUMENTS[] = {2,1,1,2,0,4,2,6,4,7,2,1,1,2,0,4,2,6,4,7,0};
 const uint8_t PATH_COMMAND_ARGUMENTS[] = {
 	'm', 2,
@@ -100,8 +97,8 @@ typedef struct eeprom_record_t {
 	int16_t y;
 };
 
-int16_t current_position_x;
-int16_t current_position_y;
+int16_t current_position_x = 0;
+int16_t current_position_y = 0;
 // uint8_t steps_delay_ms = STEPS_DELAY_MS;
 // bool text_right_diraction = false;
 // uint8_t text_char_sep = 10;
@@ -113,16 +110,12 @@ uint8_t lamp_fade_index = 0;
 uint32_t lamp_fade_ms = 0;
 
 
-void write_current_position_to_eeprom() {
-	eeprom_record_t eeprom_record;
-
-	// EEPROM.write(EEPROM_RECORD_ADDRESS, EEPROM_STATUS_INVALID);
-	Serial.print(F("set record to: "));
-	print_point(current_position_x, current_position_y);
-	eeprom_record.x = current_position_x;
-	eeprom_record.y = current_position_y;
-	eeprom_record.status = EEPROM_STATUS_VALID;
-	EEPROM.put(EEPROM_RECORD_ADDRESS, eeprom_record);
+void print_point(int16_t x, int16_t y) {
+	Serial.print('(');
+	Serial.print(x);
+	Serial.print(", ");
+	Serial.print(y);
+	Serial.println(')');
 }
 
 void set_lamp(uint8_t brightness) {
@@ -137,6 +130,28 @@ void set_laser(bool is_on) {
 		PORTB &= ~LASER_MASK;
 }
 
+void write_current_position_to_eeprom() {
+	eeprom_record_t eeprom_record;
+	// EEPROM.write(EEPROM_RECORD_ADDRESS, EEPROM_STATUS_INVALID);
+	Serial.print(F("set record to: "));
+	print_point(current_position_x, current_position_y);
+	eeprom_record.x = current_position_x;
+	eeprom_record.y = current_position_y;
+	eeprom_record.status = EEPROM_STATUS_VALID;
+	EEPROM.put(EEPROM_RECORD_ADDRESS, eeprom_record);
+}
+
+void test_power() {
+	if (!(PINB & POWER_MASK)) {
+		set_lamp(0);
+		Serial.println(F("no power, write current position to eeprom!"));
+		write_current_position_to_eeprom();
+		Serial.println(F("wait for capacitors to discharge..."));
+		set_lamp(255);
+		while (true);
+	}
+}
+
 void busy_delay(uint32_t ms) {
 	lamp_fade_ms += ms;
 	ms += millis();
@@ -147,14 +162,18 @@ void busy_delay(uint32_t ms) {
 		set_lamp(LAMP_FADE_PWM[lamp_fade_index]);
 	}
 	do {
-		if (!(PINB & POWER_MASK)) {
-			Serial.print(F("no power, write current position to eeprom!"));
-			set_lamp(0);
-			write_current_position_to_eeprom();
-			Serial.print(F("wait for capacitors to discharge..."));
-			while (true);
-		}
+		test_power();
 	} while (millis() < ms);
+}
+
+/* sets the motors positions to match "current_position" global
+    must call with each change of 1 step in "current_position" global */
+void step_to_current_position() {
+	Serial.print(F("current position: "));
+	print_point(current_position_x, current_position_y);
+	PORTC = (PORTC & 0xF0) | STEPS_MASKS[current_position_y & 7];
+	PORTD = (PORTD & 0x0F) | (STEPS_MASKS[current_position_x & 7] << 4);
+	busy_delay(STEPS_DELAY_MS);
 }
 
 /* cuts the power to the motors (they will hold thier positions) 
@@ -164,22 +183,6 @@ void disable_axes() {
 	PORTD &= 0x0F;
 }
 
-/* sets the motors positions to match "current_position" global
-    must call with each change of 1 step in "current_position" global */
-void step_to_current_position() {
-	PORTC = (PORTC & 0xF0) | STEPS_MASKS[current_position_y & 7];
-	PORTD = (PORTD & 0x0F) | (STEPS_MASKS[current_position_x & 7] << 4);
-	busy_delay(STEPS_DELAY_MS);
-}
-
-void print_point(int16_t x, int16_t y) {
-	Serial.print("(");
-	Serial.print(x);
-	Serial.print(", ");
-	Serial.print(y);
-	Serial.print(")\n");
-}
-
 /* add/inc the motors current position by the given steps */
 void relative_steps(int16_t x, int16_t y) {
 	int32_t steps, err, e;
@@ -187,6 +190,8 @@ void relative_steps(int16_t x, int16_t y) {
 	int16_t delta_y = abs(y);
 	int16_t step_x = (x > 0 ? 1 : (x < 0 ? -1 : 0));
 	int16_t step_y = (y > 0 ? 1 : (y < 0 ? -1 : 0));
+
+	test_power();
 
 	steps = max(delta_x, delta_y);
 	err = (delta_x > delta_y ? delta_x : -delta_y) / 2;
@@ -203,7 +208,6 @@ void relative_steps(int16_t x, int16_t y) {
 		step_to_current_position();
 	}
 	disable_axes();
-	print_point(current_position_x, current_position_y);
 }
 
 /* go to the given axes position from current motors position */
@@ -226,13 +230,14 @@ void set_home() {
 
 /* turn laser off and put projector in home position */
 void go_home() {
+	Serial.println(F("going home"));
 	set_laser(false);
 	absolute_steps(0, 0);
 }
 
 void go_to(int16_t x, int16_t y) {
 	if (absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y))
-		Serial.println(F("Point out of range!"));
+		Serial.println(F("point out of range!"));
 	// absolute_point(x * draw_scale + draw_x, y * draw_scale + draw_y);
 }
 
@@ -291,19 +296,14 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 
 	while (true) {
 		command = pgm_read_byte(path++);
-		Serial.print(F("command: "));
-		Serial.println(command);
 		arguments_count = -1;
 		for (uint8_t i = 0; i < sizeof(PATH_COMMAND_ARGUMENTS); i += 2) {
-			Serial.println(PATH_COMMAND_ARGUMENTS[i]);
 			if (command == PATH_COMMAND_ARGUMENTS[i]) {
 				arguments_count = PATH_COMMAND_ARGUMENTS[i + 1];
 				break;
 			}
 		}
 		arguments_count *= sizeof(*arguments);
-		Serial.print(F("arguments_count: "));
-		Serial.println(arguments_count);
 		if (arguments_count > sizeof(arguments) * sizeof(*arguments)) {
 			Serial.println(F("Command error!"));
 			return;
@@ -421,20 +421,21 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 void setup() {
 	eeprom_record_t eeprom_record;
 	Serial.begin(SERIAL_BAUDRATE);
-	Serial.println(F("start!"));
+	Serial.println(F("\nstart!"));
 
 	DDRD |= 0xF0;						// (4 - 7) OUTPUTS
 	DDRC |= 0x0F;						// (A0 - A3) OUTPUTS
-	DDRB |= LASER_MASK;					// (8, 10) OUTPUTS
+	DDRB |= LASER_MASK | LIGHT_MASK;	// (8) OUTPUT
 	pinMode(BUTTON_PIN, INPUT_PULLUP);
 
 	set_laser(false);
-	set_home();
+	set_lamp(255);
+	delay(1000);
 
 	EEPROM.get(EEPROM_RECORD_ADDRESS, eeprom_record);
 	switch (eeprom_record.status) {
 		case EEPROM_STATUS_VALID:
-			Serial.print(F("valid eeprom record, going to: "));
+			Serial.print(F("valid eeprom record: "));
 			print_point(eeprom_record.x, eeprom_record.y);
 			current_position_x = eeprom_record.x;
 			current_position_y = eeprom_record.y;
@@ -465,7 +466,7 @@ void loop() {
 	static uint8_t index = 0;
 	set_lamp(0);
     
-	while(digitalRead(BUTTON_PIN));
+	while(PINB & BUTTON_MASK);
 		switch (index++) {
 		case 0:
 			draw_path(SVGS_SNOWFLAKE_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.0);
@@ -506,7 +507,7 @@ void loop() {
 	set_lamp(255);
 	go_home();
 	delay(1000);
-	while(!digitalRead(BUTTON_PIN));
+	while(!(PINB & BUTTON_MASK));
 }
 
 /* draw regular polygon x, y are the center point with absolute_steps */
