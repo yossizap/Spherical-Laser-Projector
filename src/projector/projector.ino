@@ -54,7 +54,9 @@
 #define X_AXIS_C_PIN				(6)
 #define X_AXIS_D_PIN				(7)
 #define LASER_PIN					(8)
+#define LIGHT_PIN					(11)
 #define BUTTON_PIN					(12)
+#define POWER_PIN					(13)
 #define Y_AXIS_A_PIN				(A0)
 #define Y_AXIS_B_PIN				(A1)
 #define Y_AXIS_C_PIN				(A2)
@@ -62,6 +64,9 @@
 
 #define _PINB_MASK(pin)				(1 << (pin - 8))
 #define LASER_MASK					(_PINB_MASK(LASER_PIN))
+#define LIGHT_MASK					(_PINB_MASK(LIGHT_PIN))
+#define BUTTON_MASK					(_PINB_MASK(BUTTON_PIN))
+#define POWER_MASK					(_PINB_MASK(POWER_PIN))
 
 // const uint8_t STEPS_MASKS[] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
 const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0b0011, 0b0001};
