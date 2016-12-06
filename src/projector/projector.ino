@@ -27,8 +27,9 @@
 | By A.E.TEC (Arad Eizen) 2016.                                                |
 |	                                                                           |
 \******************************************************************************/
-#include <math.h>					// asin
-#include "../gen/paths.h"
+// #include <math.h>
+#include <EEPROM.h>
+#include "gen/paths.h"
 
 
 #define CORNER_DEG					(1010)
@@ -41,14 +42,20 @@
 #define SERIAL_BUFFER_SIZE			(60)
 #define STEPS_DELAY_MS				(4)
 #define BEZIER_SEGMENTS				(30)
-#define STEPS_PER_RADIAN			(648.68)
-#define Z_SQARE						(10000) // 19700
+// #define STEPS_PER_RADIAN			(648.68)
+// #define Z_SQARE						(10000) // 19700
+#define LAMP_FADE_MS				(100)
+#define EEPROM_RECORD_ADDRESS		(0)
+#define EEPROM_STATUS_VALID			(0x55)
+// #define EEPROM_STATUS_INVALID		(0xAA)
 
 #define X_AXIS_A_PIN				(4)
 #define X_AXIS_B_PIN				(5)
 #define X_AXIS_C_PIN				(6)
 #define X_AXIS_D_PIN				(7)
 #define LASER_PIN					(8)
+#define POWER_PIN					(9)
+#define LIGHT_PIN					(10)
 #define BUTTON_PIN					(12)
 #define Y_AXIS_A_PIN				(A0)
 #define Y_AXIS_B_PIN				(A1)
@@ -56,9 +63,12 @@
 #define Y_AXIS_D_PIN				(A3)
 
 #define LASER_MASK					(0x01)
+#define POWER_MASK					(0x02)
+// #define LIGHT_MASK					(0x04)
 
 // const uint8_t STEPS_MASKS[] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
 const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0b0011, 0b0001};
+const uint8_t LAMP_FADE_PWM[] = {10, 20, 40, 80, 160, 255, 200, 100, 40};
 // const uint8_t PATH_COMMAND_ARGUMENTS[] = {2,1,1,2,0,4,2,6,4,7,2,1,1,2,0,4,2,6,4,7,0};
 const uint8_t PATH_COMMAND_ARGUMENTS[] = {
 	'm', 2,
@@ -84,23 +94,67 @@ const uint8_t PATH_COMMAND_ARGUMENTS[] = {
 	'e', 0,
 };
 
+typedef struct eeprom_record_t {
+	uint8_t status;
+	int16_t x;
+	int16_t y;
+};
+
 int16_t current_position_x;
 int16_t current_position_y;
-int16_t draw_last_x;
-int16_t draw_last_y;
+// uint8_t steps_delay_ms = STEPS_DELAY_MS;
 // bool text_right_diraction = false;
 // uint8_t text_char_sep = 10;
 int16_t draw_x = 0;
 int16_t draw_y = 0;
-double draw_scale = 2;
+double draw_scale = 2.0;
+
+uint8_t lamp_fade_index = 0;
+uint32_t lamp_fade_ms = 0;
 
 
-/* turn laser on or off (pull mosfet gate down to turn the laser on) */
+void write_current_position_to_eeprom() {
+	eeprom_record_t eeprom_record;
+
+	// EEPROM.write(EEPROM_RECORD_ADDRESS, EEPROM_STATUS_INVALID);
+	Serial.print(F("set record to: "));
+	print_point(current_position_x, current_position_y);
+	eeprom_record.x = current_position_x;
+	eeprom_record.y = current_position_y;
+	eeprom_record.status = EEPROM_STATUS_VALID;
+	EEPROM.put(EEPROM_RECORD_ADDRESS, eeprom_record);
+}
+
+void set_lamp(uint8_t brightness) {
+	analogWrite(LIGHT_PIN, brightness);
+}
+
+/* turn laser on or off (pull npn base up to turn the laser on) */
 void set_laser(bool is_on) {
 	if (is_on)
 		PORTB |= LASER_MASK;
 	else
 		PORTB &= ~LASER_MASK;
+}
+
+void busy_delay(uint32_t ms) {
+	lamp_fade_ms += ms;
+	ms += millis();
+	if (lamp_fade_ms > LAMP_FADE_MS) {
+		lamp_fade_ms = 0;
+		if (++lamp_fade_index >= sizeof(LAMP_FADE_PWM))
+			lamp_fade_index = 0;
+		set_lamp(LAMP_FADE_PWM[lamp_fade_index]);
+	}
+	do {
+		if (!(PINB & POWER_MASK)) {
+			Serial.print(F("no power, write current position to eeprom!"));
+			set_lamp(0);
+			write_current_position_to_eeprom();
+			Serial.print(F("wait for capacitors to discharge..."));
+			while (true);
+		}
+	} while (millis() < ms);
 }
 
 /* cuts the power to the motors (they will hold thier positions) 
@@ -115,7 +169,7 @@ void disable_axes() {
 void step_to_current_position() {
 	PORTC = (PORTC & 0xF0) | STEPS_MASKS[current_position_y & 7];
 	PORTD = (PORTD & 0x0F) | (STEPS_MASKS[current_position_x & 7] << 4);
-	delay(STEPS_DELAY_MS);
+	busy_delay(STEPS_DELAY_MS);
 }
 
 void print_point(int16_t x, int16_t y) {
@@ -162,13 +216,6 @@ bool absolute_steps(int16_t x, int16_t y) {
 	return false;
 }
 
-/* convert absolute point to absolute axes steps */
-void absolute_point(int32_t x, int32_t y) {
-	double n = sqrt(x * x + y * y + Z_SQARE);
-	double a = asin(y / n);
-	absolute_steps(round(STEPS_PER_RADIAN * asin(x / n / cos(a))), round(STEPS_PER_RADIAN * a));
-}
-
 /* set the current laser position to (0, 0) for trigo to work */
 void set_home() {
 	current_position_x = 0;
@@ -185,7 +232,7 @@ void go_home() {
 
 void go_to(int16_t x, int16_t y) {
 	if (absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y))
-		Serial.println("Point out of range!");
+		Serial.println(F("Point out of range!"));
 	// absolute_point(x * draw_scale + draw_x, y * draw_scale + draw_y);
 }
 
@@ -201,29 +248,24 @@ void draw_arc(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t 
 }
 
 void draw_quadratic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
-	int16_t pts[BEZIER_SEGMENTS + 1][2];
-	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; ++i) {
+	go_to(x0, y0);
+	set_laser(true);
+	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; i++) {
 		double t = (double)i / (double)BEZIER_SEGMENTS;
 		double a = pow((1.0 - t), 2.0);
 		double b = 2.0 * t * (1.0 - t);
 		double c = pow(t, 2.0);
 		double x = a * x0 + b * x1 + c * x2;
 		double y = a * y0 + b * y1 + c * y2;
-		pts[i][0] = x;
-		pts[i][1] = y;
+		go_to(x, y);
 	}
-
-	/* draw segments */
-	go_to(x0, y0);
-	set_laser(true);
-	for (uint8_t i = 0; i < BEZIER_SEGMENTS; ++i) {
-		draw_line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
-	}
+	set_laser(false);
 }
 
 void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3) {
-	int16_t pts[BEZIER_SEGMENTS + 1][2];
-	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; ++i) {
+	go_to(x0, y0);
+	set_laser(true);
+	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; i++) {
 		double t = (double)i / (double)BEZIER_SEGMENTS;
 		double a = pow((1.0 - t), 3.0);
 		double b = 3.0 * t * pow((1.0 - t), 2.0);
@@ -231,16 +273,9 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 		double d = pow(t, 3.0);
 		double x = a * x0 + b * x1 + c * x2 + d * x3;
 		double y = a * y0 + b * y1 + c * y2 + d * y3;
-		pts[i][0] = x;
-		pts[i][1] = y;
+		go_to(x, y);
 	}
-
-	/* draw segments */
-	go_to(x0, y0);
-	set_laser(true);
-	for (uint8_t i = 0; i < BEZIER_SEGMENTS; ++i) {
-		draw_line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
-	}
+	set_laser(false);
 }
 
 void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
@@ -254,9 +289,9 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 	draw_y = y;
 	draw_scale = scale;
 
-	for (;;) {
+	while (true) {
 		command = pgm_read_byte(path++);
-		Serial.print("command: ");
+		Serial.print(F("command: "));
 		Serial.println(command);
 		arguments_count = -1;
 		for (uint8_t i = 0; i < sizeof(PATH_COMMAND_ARGUMENTS); i += 2) {
@@ -267,10 +302,10 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 			}
 		}
 		arguments_count *= sizeof(*arguments);
-		Serial.print("arguments_count: ");
+		Serial.print(F("arguments_count: "));
 		Serial.println(arguments_count);
 		if (arguments_count > sizeof(arguments) * sizeof(*arguments)) {
-			Serial.println("Command error!");
+			Serial.println(F("Command error!"));
 			return;
 		}
 		
@@ -365,59 +400,62 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 			break;
 			case 'a':
 			case 'A':
-				Serial.println("Arc!");
+				Serial.println(F("Arc!"));
 			break;
 			case 'e':
 			case 'E':
 				set_laser(false);
-				Serial.println("Path end!");
+				Serial.println(F("Path end!"));
 				return;
 			break;
 			default:
 				set_laser(false);
-				Serial.println("Path error!");
+				Serial.println(F("Path error!"));
 				return;
 			break;
 		}
 	}
 }
 
-void test() {
-	/*for (uint16_t i = 0; i < 1010*2; i++)
-		relative_steps(1, 0);
-	delay(3000);
-	go_home();
-	for (uint16_t i = 0; i < 1010; i++)
-		relative_steps(-1, 0);
-	delay(3000);
-	go_home();*/
-	/*
-	for (uint16_t i = 0; i < 1700; i++)
-		relative_steps(0, 1);
-	delay(3000);
-	go_home();
-	for (uint16_t i = 0; i < 1700; i++)
-		relative_steps(0, -1);
-	delay(3000);
-	go_home();*/
-}
-
 /* called once at power-on */
 void setup() {
+	eeprom_record_t eeprom_record;
 	Serial.begin(SERIAL_BAUDRATE);
-	DDRD |= 0xF0;				// (4 - 7) OUTPUTS
-	DDRC |= 0x0F;				// (A0 - A3) OUTPUTS
-	DDRB |= LASER_MASK;			// (8) OUTPUT
-	set_laser(false);			// turn off laser
+	Serial.println(F("start!"));
+
+	DDRD |= 0xF0;						// (4 - 7) OUTPUTS
+	DDRC |= 0x0F;						// (A0 - A3) OUTPUTS
+	DDRB |= LASER_MASK;					// (8, 10) OUTPUTS
 	pinMode(BUTTON_PIN, INPUT_PULLUP);
+
+	set_laser(false);
 	set_home();
-	// -X is right
-	// -Y is left
+
+	EEPROM.get(EEPROM_RECORD_ADDRESS, eeprom_record);
+	switch (eeprom_record.status) {
+		case EEPROM_STATUS_VALID:
+			Serial.print(F("valid eeprom record, going to: "));
+			print_point(eeprom_record.x, eeprom_record.y);
+			current_position_x = eeprom_record.x;
+			current_position_y = eeprom_record.y;
+			go_home();
+			write_current_position_to_eeprom();
+		break;
+/*		case EEPROM_STATUS_INVALID:
+			Serial.println(F("invalid eeprom record, must be fixed by IDE!"));
+			while (true);
+		break;*/
+		default:
+			Serial.println(F("first time eeprom read!"));
+			write_current_position_to_eeprom();
+		break;
+	}
+
 	// relative_steps(20, 0); set_home();
 	// set_laser(true); delay(100); set_laser(false);
 }
 
-/* Starting positions for the drawings. */
+/* starting positions for the drawings. */
 #define DEFAULT_X_POS (900)
 #define DEFAULT_Y_POS (700)
 #define DEFAULT_SCALE (2.0)
@@ -425,11 +463,12 @@ void setup() {
 /* called repeatedly after "setup" */
 void loop() {
 	static uint8_t index = 0;
+	set_lamp(0);
     
 	while(digitalRead(BUTTON_PIN));
 		switch (index++) {
 		case 0:
-			draw_path(SNOWFLAKE_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.0);
+			draw_path(SVGS_SNOWFLAKE_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.0);
 			break;
 		case 1:
 			draw_path(SVGS_CAMEL_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
@@ -453,7 +492,7 @@ void loop() {
 			draw_path(SVGS_HEART_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
 			break;
 		case 8:
-			draw_path(SVGS_BATMAN_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE 2.2);
+			draw_path(SVGS_BATMAN_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
 			break;
 		case 9:
 			index = 0;
@@ -464,6 +503,7 @@ void loop() {
 		break;
 	}
     
+	set_lamp(255);
 	go_home();
 	delay(1000);
 	while(!digitalRead(BUTTON_PIN));
@@ -545,3 +585,30 @@ void draw_cubic_bezier(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x
 	draw_last_y = y3;
 }
 */
+
+/*void test() {
+	for (uint16_t i = 0; i < 1010*2; i++)
+		relative_steps(1, 0);
+	delay(3000);
+	go_home();
+	for (uint16_t i = 0; i < 1010; i++)
+		relative_steps(-1, 0);
+	delay(3000);
+	go_home();
+
+	for (uint16_t i = 0; i < 1700; i++)
+		relative_steps(0, 1);
+	delay(3000);
+	go_home();
+	for (uint16_t i = 0; i < 1700; i++)
+		relative_steps(0, -1);
+	delay(3000);
+	go_home();
+}*/
+
+/* convert absolute point to absolute axes steps */
+/*void absolute_point(int32_t x, int32_t y) {
+	double n = sqrt(x * x + y * y + Z_SQARE);
+	double a = asin(y / n);
+	absolute_steps(round(STEPS_PER_RADIAN * asin(x / n / cos(a))), round(STEPS_PER_RADIAN * a));
+}*/
