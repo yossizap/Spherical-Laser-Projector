@@ -27,7 +27,7 @@
 | By A.E.TEC (Arad Eizen) 2016.                                                |
 |	                                                                           |
 \******************************************************************************/
-// #include <math.h>
+#include <math.h>
 #include <EEPROM.h>
 #include "gen/paths.h"
 
@@ -67,6 +67,17 @@
 #define LIGHT_MASK					(_PINB_MASK(LIGHT_PIN))
 #define BUTTON_MASK					(_PINB_MASK(BUTTON_PIN))
 #define POWER_MASK					(_PINB_MASK(POWER_PIN))
+
+#include <avr/wdt.h>
+#define SOFT_RESET()        \
+do                          \
+{                           \
+	wdt_enable(WDTO_15MS);  \
+	for(;;)                 \
+	{                       \
+	}                       \
+} while(0)
+
 
 // const uint8_t STEPS_MASKS[] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
 const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0b0011, 0b0001};
@@ -151,9 +162,13 @@ void test_power() {
 		set_lamp(0);
 		Serial.println(F("no power, write current position to eeprom!"));
 		write_current_position_to_eeprom();
-		Serial.println(F("wait for capacitors to discharge..."));
+		disable_axes();
+		set_laser(0);
 		set_lamp(255);
-		while (true);
+		Serial.println(F("wait for power up..."));
+		while (!(PINB & POWER_MASK));
+		Serial.println(F("power returned, restarting processor"));
+		SOFT_RESET();
 	}
 }
 
@@ -241,7 +256,7 @@ void go_home() {
 }
 
 void go_to(int16_t x, int16_t y) {
-	if (absolute_steps(x * draw_scale + draw_x, y * draw_scale + draw_y))
+	if (absolute_steps(round(x * draw_scale) + draw_x, round(y * draw_scale) + draw_y))
 		Serial.println(F("point out of range!"));
 	// absolute_point(x * draw_scale + draw_x, y * draw_scale + draw_y);
 }
@@ -288,7 +303,7 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 	set_laser(false);
 }
 
-void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
+void draw_path(PGM_P path, int16_t x, int16_t y, double scale, bool only_start_point) {
 	uint8_t command;
 	uint8_t arguments_count;
 	int16_t start_x = 0, start_y = 0, a_x, a_y;
@@ -328,6 +343,12 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 				m_y = arguments[1];
 				start_x = m_x;
 				start_y = m_y;
+				if (only_start_point) {
+					Serial.println(F("going to start point: "));
+					print_point(start_x, start_y);
+					go_to(start_x, start_y);
+					return;
+				}
 			break;
 			case 'h':
 				arguments[0] += start_x;
@@ -422,6 +443,60 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 	}
 }
 
+/* starting positions for the drawings. */
+#define DEFAULT_X_POS (-100)
+#define DEFAULT_Y_POS (600)
+#define DEFAULT_SCALE (2.0)
+
+bool draw_next_path(uint8_t index, bool only_start_point) {
+	switch (index) {
+	case 0:
+		draw_path(SVGS_HAND_3_PATH, DEFAULT_X_POS + 250, DEFAULT_Y_POS - 100, DEFAULT_SCALE - 1.0, only_start_point);
+		break;
+	case 1:
+		draw_path(SVGS_BRAIN_1_PATH, DEFAULT_X_POS + 150, DEFAULT_Y_POS, DEFAULT_SCALE - 1.2, only_start_point);
+		break;
+	case 2:
+		draw_path(SVGS_TRISKELITON_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS - 100, DEFAULT_SCALE - 1.9, only_start_point);
+		break;
+	case 3:
+		draw_path(SVGS_PATTERN_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS - 600, DEFAULT_SCALE - 0.5, only_start_point);
+		break;
+	case 4:
+		draw_path(SVGS_PATTERN_2_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS - 100, DEFAULT_SCALE - 1.0, only_start_point);
+		break;
+	case 5:
+		draw_path(SVGS_CAMEL_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2, only_start_point);
+		break;
+	case 6:
+		draw_path(SVGS_YIN_YANG_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 1.2, only_start_point);
+		break;
+	case 7:
+		draw_path(SVGS_COW_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2, only_start_point);	
+		break;
+	case 8:
+		draw_path(SVGS_MENORAH_1_PATH, DEFAULT_X_POS, DEFAULT_Y_POS, DEFAULT_SCALE + 0.2, only_start_point);			
+		break;
+	case 9:
+		draw_path(SVGS_SNOWFLAKE_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.0, only_start_point);
+		break;
+	case 10:
+		draw_path(SVGS_PRESENT_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 0.2, only_start_point);
+		break;
+	case 11:
+		draw_path(SVGS_BALL_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2, only_start_point);
+		break;
+	case 12:
+		draw_path(SVGS_BATMAN_1_PATH, DEFAULT_X_POS - 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.0, only_start_point);
+		break;
+	default:
+		return true;
+	break;
+	}
+	
+	return false;
+}
+
 /* called once at power-on */
 void setup() {
 	eeprom_record_t eeprom_record;
@@ -456,61 +531,32 @@ void setup() {
 			write_current_position_to_eeprom();
 		break;
 	}
+	
+	/* Move to the first path's starting coordinates */
+	draw_next_path(0, true);
 
-	// relative_steps(20, 0); set_home();
+	//relative_steps(+40, 0); set_home();
 	// set_laser(true); delay(100); set_laser(false);
 }
 
-/* starting positions for the drawings. */
-#define DEFAULT_X_POS (900)
-#define DEFAULT_Y_POS (700)
-#define DEFAULT_SCALE (2.0)
-			
 /* called repeatedly after "setup" */
 void loop() {
 	static uint8_t index = 0;
+	bool is_last_point = false;
 	set_lamp(0);
     
 	while(PINB & BUTTON_MASK);
-		switch (index++) {
-		case 0:
-			draw_path(SVGS_SNOWFLAKE_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.0);
-			break;
-		case 1:
-			draw_path(SVGS_CAMEL_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
-			break;
-		case 2:
-			draw_path(SVGS_COW_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);	
-			break;			
-		case 3:
-			draw_path(SVGS_MENORAH_1_PATH, DEFAULT_X_POS, DEFAULT_Y_POS, DEFAULT_SCALE + 0.2);			
-			break;
-		case 4:
-			draw_path(SVGS_YIN_YANG_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 1.2);
-			break;
-		case 5:
-			draw_path(SVGS_PRESENT_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 0.2);
-			break;
-		case 6:
-			draw_path(SVGS_BALL_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
-			break;
-		case 7:
-			draw_path(SVGS_HEART_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
-			break;
-		case 8:
-			draw_path(SVGS_BATMAN_1_PATH, DEFAULT_X_POS + 100, DEFAULT_Y_POS, DEFAULT_SCALE + 2.2);
-			break;
-		case 9:
-			index = 0;
-			return;
-		default:
-			index = 0;
-			return;
-		break;
+	
+	draw_next_path(index, false);
+	++index;
+	if (draw_next_path(index, true)) {
+		index = 0;
+		draw_next_path(index, true);
 	}
-    
+
+	write_current_position_to_eeprom();
 	set_lamp(255);
-	go_home();
+	// go_home();
 	delay(1000);
 	while(!(PINB & BUTTON_MASK));
 }

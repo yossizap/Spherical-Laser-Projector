@@ -28,11 +28,11 @@ ARC_INSTRUCTION =  hex(ord("a"))
 DRAW_START_INSTRUCTION =  hex(ord("m"))
 
 # Format string for array and function arguments generation
-LINE_FORMAT = "{0}, {1}" # {XEND}, {YEND}
-QUADRATIC_BEZIER_FORMAT = "{0}, {1}, {2}, {3}" # {XCNT}, {YCNT}, {XEND}, {YEND}
-ARC_FORMAT = "{0}, {1}, {2}, {3}, {4}, {5}, {6}" # {XRADIUS}, {YRADIUS}, {ROTATION}, {ARC}, {SWEEP}, {XEND}, {YEND}
-CUBIC_BEZIER_FORMAT = "{0}, {1}, {2}, {3}, {4}, {5}" # {XCNT1}, {YCNT1}, {XCNT2}, {YCNT2}, {XEND}, {YEND}
-DRAW_START_FORMAT = "{0}, {1}" # {XSTART, YSTART}
+LINE_FORMAT = "{0}, {1}," # {XEND}, {YEND}
+QUADRATIC_BEZIER_FORMAT = "{0}, {1}, {2}, {3}," # {XCNT}, {YCNT}, {XEND}, {YEND}
+ARC_FORMAT = "{0}, {1}, {2}, {3}, {4}, {5}, {6}," # {XRADIUS}, {YRADIUS}, {ROTATION}, {ARC}, {SWEEP}, {XEND}, {YEND}
+CUBIC_BEZIER_FORMAT = "{0}, {1}, {2}, {3}, {4}, {5}," # {XCNT1}, {YCNT1}, {XCNT2}, {YCNT2}, {XEND}, {YEND}
+DRAW_START_FORMAT = "{0}, {1}," # {XSTART, YSTART}
 
 # function externs
 g_externs = "extern void %s(int16_t x1, int16_t y1);\n" % DRAW_START_FUNC_NAME
