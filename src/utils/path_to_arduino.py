@@ -22,13 +22,13 @@ def parse_svg_number_to_data(number):
     return struct.pack("<h", int(round(number * ROUNDING_MULTIPLIER)))
 
 def parse_svg_path(path):
-    path = path.replace(SVG_POINT_SEPARATOR, " ")
+    path = path.replace(SVG_POINT_SEPARATOR, " ").replace("-", " -").replace("  ", " ")
 
     for command in SVG_PATH_COMMANDS:
         path = path.replace(command, " %s " % (command,))
 
     return "".join([i if i in SVG_PATH_COMMANDS else parse_svg_number_to_data(float(i))
-        for i in path.strip().split(" ")])
+        for i in path.strip().split(" ") if i])
 
 def convert_image_to_bitmap(image_path, bitmap_path, bitmap_name, append=False):
     paths = []
