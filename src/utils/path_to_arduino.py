@@ -28,7 +28,7 @@ def parse_svg_path(path):
         path = path.replace(command, " %s " % (command,))
 
     return "".join([i if i in SVG_PATH_COMMANDS else parse_svg_number_to_data(float(i))
-        for i in path.strip().split(" ") if i])
+        for i in path.split(" ") if i])
 
 def convert_image_to_bitmap(image_path, bitmap_path, bitmap_name, append=False):
     paths = []
