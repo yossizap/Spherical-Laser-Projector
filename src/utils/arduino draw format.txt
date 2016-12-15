@@ -1,0 +1,18 @@
+Arduino Draw Format 1.0:
+
+Represents a draw using binary graphic command(s).
+Each command is 8 bits, follow by optional little-endian 16 bits arguments,
+Some commands have 8 bits point-count extention.
+All points are absolute from 0,0 - left top of draw.
+
+command + [arguments...]
+	0										= "draw end" end of draw, last command
+	1										= "draw close" go to start, last command
+	2	x0,y0								= "draw start" go to (x0,y0)
+	3	x0,y0								= "draw restart" go to start, and start from (x0,y0)
+	4	x,y									= "draw line" from (x0,y0) to (x,y)
+	5	n,...,xn,yn							= "draw lines" from (x0,y0) to (xn,yn)
+	6	xa,ya,x,y							= "draw quadratic bezier" curve from (x0,y0) to (x,y)
+	7	n,xa,ya,x,y,...,xan,yan				= "draw quadratic beziers" curves from (x0,y0) to (xan,yan)
+	8	xa,ya,xb,yb,x,y						= "draw cubic bezier" curve from (x0,y0) to (x,y)
+	9 	n,xa,ya,xb,yb,x,y,xan,yan,xbn,ybn	= "draw cubic beziers" curves from (x0,y0) to (xbn,ybn)
