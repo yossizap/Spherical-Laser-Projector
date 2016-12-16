@@ -1,5 +1,6 @@
 #include <math.h>
-#include "gen/paths.h"
+#include "gen/bicycle_2.h"
+#include "gen/text_1.h"
 
 
 #define X_AXIS_LIMIT_MIN			(-1200)
@@ -35,16 +36,6 @@
 const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0b0011, 0b0001};
 // const uint8_t PATH_COMMAND_ARGUMENTS[] = {2,1,1,2,0,4,2,6,4,7,2,1,1,2,0,4,2,6,4,7,0};
 const uint8_t PATH_COMMAND_ARGUMENTS[] = {
-	'm', 2,
-	'h', 1,
-	'v', 1,
-	'l', 2,
-	'z', 0,
-	'q', 4,
-	't', 2,
-	'c', 6,
-	's', 4,
-	'a', 7,
 	'M', 2,
 	'H', 1,
 	'V', 1,
@@ -54,8 +45,8 @@ const uint8_t PATH_COMMAND_ARGUMENTS[] = {
 	'T', 2,
 	'C', 6,
 	'S', 4,
-	'A', 7,
-	'e', 0,
+	'A', 5,
+	'E', 0,
 };
 
 int16_t current_position_x = 0;
@@ -214,12 +205,11 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 	uint8_t i;
 	uint8_t command;
-	uint8_t old_command='e';
 	uint8_t arguments_count;
-	int16_t start_x = 0, start_y = 0, a_x, a_y;
-	int16_t old_start_x = 0, old_start_y = 0, old_a_x, old_a_y;
-	int16_t m_x = 0, m_y = 0;
-	int16_t arguments[7];
+	int16_t current_x, current_y;
+	int16_t control_x, control_y;
+	int16_t start_x, start_y;
+	int16_t arguments[6];
 
 	draw_x = x;
 	draw_y = y;
@@ -227,138 +217,87 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 
 	while (true) {
 		command = pgm_read_byte(path++);
-		// arguments_count = -1;
 		for (i = 0; i < sizeof(PATH_COMMAND_ARGUMENTS); i += 2) {
 			if (command == PATH_COMMAND_ARGUMENTS[i]) {
 				arguments_count = PATH_COMMAND_ARGUMENTS[i + 1];
 				break;
 			}
 		}
-		if (i != sizeof(PATH_COMMAND_ARGUMENTS)) {
-			old_command = command;
-			// old_start_x = start_x;
-			// old_start_y = start_y;
-			// old_a_x = a_x;
-			// old_a_y = a_y;
-			arguments_count *= sizeof(*arguments);
-			if (arguments_count > sizeof(arguments) * sizeof(*arguments)) {
-				Serial.println(F("Command error!"));
-				return;
-			}
+		if (i == sizeof(PATH_COMMAND_ARGUMENTS)) {
+			Serial.println(F("bad command!"));
+			return;
 		}
-		else {
-			command = old_command;
-			// start_x = old_start_x;
-			// start_y = old_start_y;
-			// a_x = old_a_x;
-			// a_y = old_a_y;
-			path--;
-		}
-		
+		arguments_count *= sizeof(*arguments);
 		memcpy_P(arguments, path, arguments_count);
 		path += arguments_count;
 
 		switch (command) {
-			case 'm':
-				// arguments[0] += start_x;
-				// arguments[1] += start_y;
 			case 'M':
-				if (start_x != arguments[0] || start_y != arguments[1])
-					set_laser(false);
-				m_x = arguments[0];
-				m_y = arguments[1];
-				start_x = m_x;
-				start_y = m_y;
+				set_laser(false);
+				start_x = arguments[0];
+				start_y = arguments[1];
+				current_x = start_x;
+				current_y = start_y;
+				go_to(current_x, current_y);
 			break;
-			case 'h':
-				arguments[0] += start_x;
 			case 'H':
-				draw_line(start_x, start_y, arguments[0], start_y);
-				start_x = arguments[0];
+				set_laser(true);
+				go_to(arguments[0], current_y);
+				current_x = arguments[0];
 			break;
-			case 'v':
-				arguments[0] += start_y;
 			case 'V':
-				draw_line(start_x, start_y, start_x, arguments[0]);
-				start_y = arguments[0];
+				set_laser(true);
+				go_to(current_x, arguments[0]);
+				current_y = arguments[0];
 			break;
-			case 'l':
-				arguments[0] += start_x;
-				arguments[1] += start_y;
 			case 'L':
-				draw_line(start_x, start_y, arguments[0], arguments[1]);
-				start_x = arguments[0];
-				start_y = arguments[1];
+				set_laser(true);
+				go_to(arguments[0], arguments[1]);
+				current_x = arguments[0];
+				current_y = arguments[1];
 			break;
-			case 'z':
 			case 'Z':
-				draw_line(start_x, start_y, m_x, m_y);
-				start_x = m_x;
-				start_y = m_y;
+				set_laser(true);
+				go_to(start_x, start_y);
+				current_x = start_x;
+				current_y = start_y;
 			break;
-			case 'q':
-				arguments[0] += start_x;
-				arguments[1] += start_y;
-				arguments[2] += start_x;
-				arguments[3] += start_y;
 			case 'Q':
-				draw_quadratic_bezier(start_x, start_y, arguments[0], arguments[1], arguments[2], arguments[3]);
-				a_x = arguments[0];
-				a_y = arguments[1];
-				start_x = arguments[2];
-				start_y = arguments[3];
+				draw_quadratic_bezier(current_x, current_y, arguments[0], arguments[1], arguments[2], arguments[3]);
+				control_x = arguments[0];
+				control_y = arguments[1];
+				current_x = arguments[2];
+				current_y = arguments[3];
 			break;
-			case 't':
-				arguments[0] += start_x;
-				arguments[1] += start_y;
 			case 'T':
-				a_x += a_x - start_x;
-				a_y += a_y - start_y;
-				draw_quadratic_bezier(start_x, start_y, a_x, a_y, arguments[0], arguments[1]);
-				start_x = arguments[0];
-				start_y = arguments[1];
+				control_x += control_x - current_x;
+				control_y += control_y - current_y;
+				draw_quadratic_bezier(current_x, current_y, control_x, control_y, arguments[0], arguments[1]);
+				current_x = arguments[0];
+				current_y = arguments[1];
 			break;
-			case 'c':
-				arguments[0] += start_x;
-				arguments[1] += start_y;
-				arguments[2] += start_x;
-				arguments[3] += start_y;
-				arguments[4] += start_x;
-				arguments[5] += start_y;
 			case 'C':
-				draw_cubic_bezier(start_x, start_y, arguments[0], arguments[1], arguments[2], arguments[3], arguments[4], arguments[5]);
-				a_x = arguments[2];
-				a_y = arguments[3];
-				start_x = arguments[4];
-				start_y = arguments[5];
+				draw_cubic_bezier(current_x, current_y, arguments[0], arguments[1], arguments[2], arguments[3], arguments[4], arguments[5]);
+				control_x = arguments[2];
+				control_y = arguments[3];
+				current_x = arguments[4];
+				current_y = arguments[5];
 			break;
-			case 's':
-				arguments[0] += start_x;
-				arguments[1] += start_y;
-				arguments[2] += start_x;
-				arguments[3] += start_y;
 			case 'S':
-				a_x += a_x - start_x;
-				a_y += a_y - start_y;
-				draw_cubic_bezier(start_x, start_y, a_x, a_y, arguments[0], arguments[1], arguments[2], arguments[3]);
-				start_x = arguments[2];
-				start_y = arguments[3];
-				// a_x = arguments[0];
-				// a_y = arguments[1];
+				control_x += control_x - current_x;
+				control_y += control_y - current_y;
+				draw_cubic_bezier(current_x, current_y, control_x, control_y, arguments[0], arguments[1], arguments[2], arguments[3]);
+				current_x = arguments[2];
+				current_y = arguments[3];
 			break;
-			case 'a':
 			case 'A':
-				Serial.println(F("Arc!"));
+				//TODO: implement arc!
+				set_laser(true);
+				go_to(arguments[3], arguments[4]);
 			break;
-			case 'e':
 			case 'E':
 				set_laser(false);
-				Serial.println(F("Path end!"));
-				return;
-			break;
-			default:
-				set_laser(false);
-				Serial.println(F("Path error!"));
+				Serial.println(F("path end!"));
 				return;
 			break;
 		}
@@ -370,8 +309,8 @@ void setup() {
 	Serial.begin(SERIAL_BAUDRATE);
 	Serial.println(F("\nstart!"));
 
-	DDRD |= 0xF0;						// (4 - 7) OUTPUTS
-	DDRC |= 0x0F;						// (A0 - A3) OUTPUTS
+	DDRD |= 0xF0;				// (4 - 7) OUTPUTS
+	DDRC |= 0x0F;				// (A0 - A3) OUTPUTS
 	PORTB &= ~LASERS_MASK;		// (8, 9) LOW for laser outputs
 	set_lasers(0);				// turn off lasers
 	// delay(1000);
@@ -379,9 +318,9 @@ void setup() {
 	// set_laser(true); delay(100); set_laser(false);
 
 	// draw_path(SVGS_MENORAH_1_PATH, -100, 0, 1.9);
-	// draw_path(SVGS_BICYCLE_3_PATH, -200, 0, 1.8);
 	// draw_path(SVGS_MUSEUM_LOGO_1_PATH, -400, 100, 2.5);
-	draw_path(SVGS_TEXT_1_PATH, -400, -400, 1.8);
+	draw_path(BICYCLE_2_DRAW, -400, -400, 1.7);
+	draw_path(TEXT_1_DRAW, -200, -400, 1.3);
 	go_home();
 }
 

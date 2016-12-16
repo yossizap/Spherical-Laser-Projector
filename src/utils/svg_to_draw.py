@@ -4,73 +4,166 @@ import os.path
 import argparse
 import xml.etree.ElementTree as ElementTree
 
-
 SVG_ARGUMENT_ROUNDING_MULTIPLIER = 1
 SVG_XML_NAMESPACE = "http://www.w3.org/2000/svg"
 
-SVG_COMMANDS_ARGUMENTS_COUNT = {
-    "m": 2,
-    "h": 1,
-    "v": 1,
-    "l": 2,
-    "z": 0,
-    "q": 4,
-    "t": 2,
-    "c": 6,
-    "s": 4,
-    "a": 7,
+SVG_PATH_COMMAND_SIZE = {
+    "M": 2,
+    "H": 1,
+    "V": 1,
+    "L": 2,
+    "Z": 0,
+    "Q": 4,
+    "T": 2,
+    "C": 6,
+    "S": 4,
+    "A": 7,
 }
 
-SVG_COMMANDS = "".join(SVG_COMMANDS_ARGUMENTS_COUNT.keys())
-SVG_COMMANDS += SVG_COMMANDS.upper()
+SVG_COMMANDS = "".join(SVG_PATH_COMMAND_SIZE.keys())
+SVG_COMMANDS += SVG_COMMANDS.lower()
 SVG_COMMANDS_RE = re.compile("([%s])" % (SVG_COMMANDS,))
 SVG_ARGUMENT_RE = re.compile("[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?")
 
-C_ARRAY_FORMAT = \
-"""/* draw size: %s bytes */
+C_ARRAY_FORMAT = """/* draw size: %s bytes */
 static const uint8_t %s[] PROGMEM = {
-	%s
+\t%s
 };
 """
+
+
+def absolute_arguments_points(holder, arguments):
+    return [j + holder.current_point[i % 2] for i, j in enumerate(arguments)]
+
+
+def draw_command(holder, arguments):
+    print "%s: %s" % (holder.path_command, arguments)
+    holder.draw_data += holder.path_command
+    holder.draw_data += struct.pack("<%s" % ("h" * len(arguments),), *arguments)
+
+
+def path_command_to_draw_data_m(holder, arguments, is_relative=False):
+    if is_relative:
+        arguments = absolute_arguments_points(holder, arguments)
+    draw_command(holder, arguments)
+    holder.start_point = arguments
+    holder.current_point = arguments
+
+
+def path_command_to_draw_data_h(holder, arguments, is_relative=False):
+    if is_relative:
+        arguments.append(0)
+        arguments = absolute_arguments_points(holder, arguments)
+        arguments.pop(1)
+    draw_command(holder, arguments)
+    holder.current_point[0] = arguments[0]
+
+
+def path_command_to_draw_data_v(holder, arguments, is_relative=False):
+    if is_relative:
+        arguments.insert(0, 0)
+        arguments = absolute_arguments_points(holder, arguments)
+        arguments.pop(0)
+    draw_command(holder, arguments)
+    holder.current_point[0] = arguments[1]
+
+
+def path_command_to_draw_data_l(holder, arguments, is_relative=False):
+    if is_relative:
+        arguments = absolute_arguments_points(holder, arguments)
+    draw_command(holder, arguments)
+    holder.current_point = arguments
+
+
+def path_command_to_draw_data_z(holder, arguments, is_relative=False):
+    if holder.current_point != holder.start_point:
+        holder.current_point = holder.start_point
+        draw_command(holder, arguments)
+
+
+def path_command_to_draw_data_q(holder, arguments, is_relative=False):
+    if is_relative:
+        arguments = absolute_arguments_points(holder, arguments)
+    draw_command(holder, arguments)
+    holder.current_point = arguments[2:]
+
+
+def path_command_to_draw_data_t(holder, arguments, is_relative=False):
+    if is_relative:
+        arguments = absolute_arguments_points(holder, arguments)
+    draw_command(holder, arguments)
+    holder.current_point = arguments
+
+
+def path_command_to_draw_data_c(holder, arguments, is_relative=False):
+    if is_relative:
+        arguments = absolute_arguments_points(holder, arguments)
+    draw_command(holder, arguments)
+    holder.current_point = arguments[4:]
+
+
+def path_command_to_draw_data_s(holder, arguments, is_relative=False):
+    if is_relative:
+        arguments = absolute_arguments_points(holder, arguments)
+    draw_command(holder, arguments)
+    holder.current_point = arguments[2:]
+
+
+def path_command_to_draw_data_a(holder, arguments, is_relative=False):
+    if is_relative:
+        arguments = arguments[:5].extend(absolute_arguments_points(holder, arguments[5:]))
+    arguments[0] = abs(arguments[0])
+    arguments[1] = abs(arguments[1])
+    arguments[2] %= 360
+    if arguments.pop(3):
+        arguments[2] |= 0x200
+    if arguments.pop(3):
+        arguments[2] |= 0x400
+    draw_command(holder, arguments)
+    holder.current_point = arguments[3:]
 
 
 def get_file_or_folder_name(path):
     return os.path.splitext(os.path.basename(path))[0]
 
 
-def parse_svg_argument(number):
-    return struct.pack("<h", int(round(number * SVG_ARGUMENT_ROUNDING_MULTIPLIER)))
-
-
-def tokenize_svg_path(path):
-    for command in SVG_COMMANDS_RE.split(path):
-        if command in SVG_COMMANDS:
-            yield command
-        for argument in SVG_ARGUMENT_RE.findall(command):
-            yield parse_svg_argument(argument)
-
-
-def read_svg_file_paths(svg_file):
+def read_path_from_svg_file(svg_file):
     svg_tree = ElementTree.ElementTree()
     svg_tree.parse(svg_file)
     # return the "d" field(s) (path instructions)
-    return [i.attrib["d"] for i in svg_tree.findall(".//{%s}path" % SVG_XML_NAMESPACE)]
+    paths = [i.attrib["d"] for i in svg_tree.findall(".//{%s}path" % SVG_XML_NAMESPACE)]
+    # join path and make sure they starts with M command
+    return "".join(i[0].upper() + i[1:] for i in paths if i[0] in "mM")
 
 
-def parse_svg_path_to_draw(path):
-    # TODO: finish...
-    # tokens = tokenize_svg_path(path)
-    # start_point = None
-    # while True:
-        # token = tokens.next()
-        # if token in SVG_COMMANDS:
+def parse_svg_path_to_commands(path):
+    # split path to list of (command, argument, command, argument...) strings
+    tokens = SVG_COMMANDS_RE.split(path)
+    tokens.append(tokens.pop(0))
+    # return list of ((command, argument), (command, argument)...) where argument is a list of flots
+    return zip(
+        tokens[0::2],
+        [[int(round(float(i) * SVG_ARGUMENT_ROUNDING_MULTIPLIER))
+          for i in SVG_ARGUMENT_RE.findall(j)]
+         for j in tokens[1::2]])
 
-    # TEST ONLY:
-    return "a"
 
+def parse_path_commands_to_draw_data(path_commands):
+    class Holder():
+        pass
+    holder = Holder()
+    holder.start_point = (0, 0)
+    holder.current_point = (0, 0)
+    holder.path_command = ""
+    holder.draw_data = ""
 
-def parse_svg_file_to_draw(svg_file):
-    return "".join(parse_svg_path_to_draw(path) for path in read_svg_file_paths(svg_file))
+    for command, arguments in path_commands:
+        holder.path_command = command.upper()
+        arguments_count = SVG_PATH_COMMAND_SIZE[holder.path_command]
+        function = globals()["path_command_to_draw_data_%s" % (holder.path_command.lower(),)]
+        for i in xrange((len(arguments) / arguments_count) if arguments_count else 1):
+            function(holder, arguments[i * arguments_count: (i + 1) * arguments_count], command.islower())
+    return holder.draw_data
 
 
 def parse_draw_data_to_c_array(draw_name, draw_data):
@@ -81,14 +174,17 @@ def parse_draw_data_to_c_array(draw_name, draw_data):
 
 
 def parse_svg_file_to_c_array(svg_file):
-    return parse_draw_data_to_c_array(
-        get_file_or_folder_name(svg_file),
-        parse_svg_file_to_draw(svg_file))
+    svg_path = read_path_from_svg_file(svg_file)
+    path_commands = parse_svg_path_to_commands(svg_path)
+    draw_data = parse_path_commands_to_draw_data(path_commands) + "E"
+    draw_name = get_file_or_folder_name(svg_file)
+    c_array = parse_draw_data_to_c_array(draw_name, draw_data)
+    return c_array
 
 
-def main(args):
-    with open(args.output_path, "wb") as f:
-        f.write("\n".join(parse_svg_file_to_c_array(i) for i in args.svg_files))
+def main(arguments):
+    with open(arguments.output_path, "wb") as f:
+        f.write("\n".join(parse_svg_file_to_c_array(i) for i in arguments.svg_files))
 
 
 if __name__ == "__main__":
