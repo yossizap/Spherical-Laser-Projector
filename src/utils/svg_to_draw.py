@@ -31,6 +31,36 @@ static const uint8_t %s[] PROGMEM = {
 };
 """
 
+# SVG_FILE_DATA = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+# <svg
+#    xmlns:dc="http://purl.org/dc/elements/1.1/"
+#    xmlns:cc="http://creativecommons.org/ns#"
+#    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+#    xmlns:svg="http://www.w3.org/2000/svg"
+#    xmlns="http://www.w3.org/2000/svg"
+#    version="1.1"
+#    id="svg2">
+#   <metadata
+#      id="metadata10">
+#     <rdf:RDF>
+#       <cc:Work
+#          rdf:about="">
+#         <dc:format>image/svg+xml</dc:format>
+#         <dc:type
+#            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+#         <dc:title></dc:title>
+#       </cc:Work>
+#     </rdf:RDF>
+#   </metadata>
+#   <defs
+#      id="defs8" />
+#   <path
+#      id="path4"
+#      d="%s"
+#      style="fill:none;stroke:#000000" />
+# </svg>
+# """
+
 
 def absolute_arguments_points(holder, arguments):
     return [j + holder.current_point[i % 2] for i, j in enumerate(arguments)]
@@ -38,6 +68,9 @@ def absolute_arguments_points(holder, arguments):
 
 def draw_command(holder, arguments):
     print "%s: %s" % (holder.path_command, arguments)
+    # holder.svg_path += holder.path_command
+    # if arguments:
+    #     holder.svg_path += " ".join(str(i) for i in arguments)
     holder.draw_data += holder.path_command
     holder.draw_data += struct.pack("<%s" % ("h" * len(arguments),), *arguments)
 
@@ -156,13 +189,19 @@ def parse_path_commands_to_draw_data(path_commands):
     holder.current_point = (0, 0)
     holder.path_command = ""
     holder.draw_data = ""
+    holder.svg_path = ""
 
     for command, arguments in path_commands:
         holder.path_command = command.upper()
         arguments_count = SVG_PATH_COMMAND_SIZE[holder.path_command]
         function = globals()["path_command_to_draw_data_%s" % (holder.path_command.lower(),)]
         for i in xrange((len(arguments) / arguments_count) if arguments_count else 1):
+            if i and holder.path_command == "M":
+                holder.path_command = "L"
+                function = path_command_to_draw_data_l
             function(holder, arguments[i * arguments_count: (i + 1) * arguments_count], command.islower())
+    # with open(r"C:\Users\arad-lab\Documents\GitHub\Spherical-Laser-Projector\svgs\test\test.svg", "wb") as f:
+    #     f.write(SVG_FILE_DATA % (holder.svg_path,))
     return holder.draw_data
 
 
@@ -174,10 +213,11 @@ def parse_draw_data_to_c_array(draw_name, draw_data):
 
 
 def parse_svg_file_to_c_array(svg_file):
+    draw_name = get_file_or_folder_name(svg_file)
+    print draw_name
     svg_path = read_path_from_svg_file(svg_file)
     path_commands = parse_svg_path_to_commands(svg_path)
     draw_data = parse_path_commands_to_draw_data(path_commands) + "E"
-    draw_name = get_file_or_folder_name(svg_file)
     c_array = parse_draw_data_to_c_array(draw_name, draw_data)
     return c_array
 

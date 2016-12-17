@@ -1,6 +1,5 @@
 #include <math.h>
-#include "gen/bicycle_2.h"
-#include "gen/text_1.h"
+#include "gen/svgs.h"
 
 
 #define X_AXIS_LIMIT_MIN			(-1200)
@@ -317,10 +316,22 @@ void setup() {
 	// relative_steps(-100, -100); set_home();
 	// set_laser(true); delay(100); set_laser(false);
 
-	// draw_path(SVGS_MENORAH_1_PATH, -100, 0, 1.9);
-	// draw_path(SVGS_MUSEUM_LOGO_1_PATH, -400, 100, 2.5);
-	draw_path(BICYCLE_2_DRAW, -400, -400, 1.7);
-	draw_path(TEXT_1_DRAW, -200, -400, 1.3);
+	draw_path(APPLE_1_DRAW, -400, -300, 1.0);
+	draw_path(BALL_1_DRAW, -400, -300, 1.0);
+	draw_path(BICYCLE_1_DRAW, -400, -300, 1.0);
+	draw_path(BRAIN_1_DRAW, -400, -300, 1.0);
+	draw_path(CHESS_1_DRAW, -400, -300, 1.0);
+	draw_path(HAND_1_DRAW, -400, -300, 1.0);
+	draw_path(MENORAH_1_DRAW, -400, -300, 1.0);
+	draw_path(MUSEUM_LOGO_1_DRAW, -400, -300, 1.0);
+	draw_path(MUSEUM_LOGO_2_DRAW, -400, -300, 1.0);
+	draw_path(MUSEUM_LOGO_3_DRAW, -400, -300, 1.0);
+	draw_path(PATTERN_1_DRAW, -400, -300, 1.0);
+	draw_path(PRESENT_1_DRAW, -400, -300, 1.0);
+	draw_path(RECYCLE_1_DRAW, -400, -300, 1.0);
+	draw_path(TEXT_1_DRAW, -400, -300, 1.0);
+	draw_path(TRISKELITON_1_DRAW, -400, -300, 1.0);
+	draw_path(YIN_YANG_1_DRAW, -400, -300, 1.0);
 	go_home();
 }
 
