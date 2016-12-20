@@ -1,5 +1,5 @@
 #include <math.h>
-#include "gen/svgs.h"
+#include "gen/new.h"
 
 
 #define X_AXIS_LIMIT_MIN			(-1200)
@@ -316,6 +316,14 @@ void setup() {
 	// relative_steps(-100, -100); set_home();
 	// set_laser(true); delay(100); set_laser(false);
 
+
+
+	draw_path(BUTTERFLY_1_DRAW, -400, -300, 1.0);
+	/*draw_path(ANDROID_1_DRAW, -400, -300, 1.0);
+	draw_path(EAGLE_1_DRAW, -400, -300, 1.0);
+	draw_path(FLOWER_1_DRAW, -400, -300, 1.0);
+	draw_path(LAMP_1_DRAW, -400, -300, 1.0);
+	draw_path(SOL_KEY_1_DRAW, -400, -300, 1.0);
 	draw_path(APPLE_1_DRAW, -400, -300, 1.0);
 	draw_path(BALL_1_DRAW, -400, -300, 1.0);
 	draw_path(BICYCLE_1_DRAW, -400, -300, 1.0);
@@ -331,7 +339,7 @@ void setup() {
 	draw_path(RECYCLE_1_DRAW, -400, -300, 1.0);
 	draw_path(TEXT_1_DRAW, -400, -300, 1.0);
 	draw_path(TRISKELITON_1_DRAW, -400, -300, 1.0);
-	draw_path(YIN_YANG_1_DRAW, -400, -300, 1.0);
+	draw_path(YIN_YANG_1_DRAW, -400, -300, 1.0);*/
 	go_home();
 }
 

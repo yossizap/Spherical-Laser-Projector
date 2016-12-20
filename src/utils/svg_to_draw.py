@@ -31,35 +31,68 @@ static const uint8_t %s[] PROGMEM = {
 };
 """
 
-# SVG_FILE_DATA = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-# <svg
-#    xmlns:dc="http://purl.org/dc/elements/1.1/"
-#    xmlns:cc="http://creativecommons.org/ns#"
-#    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-#    xmlns:svg="http://www.w3.org/2000/svg"
-#    xmlns="http://www.w3.org/2000/svg"
-#    version="1.1"
-#    id="svg2">
-#   <metadata
-#      id="metadata10">
-#     <rdf:RDF>
-#       <cc:Work
-#          rdf:about="">
-#         <dc:format>image/svg+xml</dc:format>
-#         <dc:type
-#            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-#         <dc:title></dc:title>
-#       </cc:Work>
-#     </rdf:RDF>
-#   </metadata>
-#   <defs
-#      id="defs8" />
-#   <path
-#      id="path4"
-#      d="%s"
-#      style="fill:none;stroke:#000000" />
-# </svg>
-# """
+INKSCAPE_SVG_FILE_TEMPLATE = """<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   width="210mm"
+   height="297mm"
+   viewBox="0 0 744.09448819 1052.3622047"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.91 r13725"
+   sodipodi:docname="template.svg">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="base"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="1.0"
+     inkscape:pageopacity="0.0"
+     inkscape:pageshadow="2"
+     inkscape:zoom="0.35"
+     inkscape:cx="-425"
+     inkscape:cy="514.28572"
+     inkscape:document-units="px"
+     inkscape:current-layer="layer1"
+     showgrid="false"
+     inkscape:window-width="1366"
+     inkscape:window-height="706"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1" />
+  <metadata
+     id="metadata7">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title />
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="%s"
+       id="path3333"
+       inkscape:connector-curvature="0" />
+  </g>
+</svg>
+"""
 
 
 def absolute_arguments_points(holder, arguments):
@@ -189,7 +222,7 @@ def parse_path_commands_to_draw_data(path_commands):
     holder.current_point = (0, 0)
     holder.path_command = ""
     holder.draw_data = ""
-    holder.svg_path = ""
+    # holder.svg_path = ""
 
     for command, arguments in path_commands:
         holder.path_command = command.upper()
@@ -201,7 +234,7 @@ def parse_path_commands_to_draw_data(path_commands):
                 function = path_command_to_draw_data_l
             function(holder, arguments[i * arguments_count: (i + 1) * arguments_count], command.islower())
     # with open(r"C:\Users\arad-lab\Documents\GitHub\Spherical-Laser-Projector\svgs\test\test.svg", "wb") as f:
-    #     f.write(SVG_FILE_DATA % (holder.svg_path,))
+    #     f.write(INKSCAPE_SVG_FILE_TEMPLATE % (holder.svg_path,))
     return holder.draw_data
 
 
@@ -216,6 +249,10 @@ def parse_svg_file_to_c_array(svg_file):
     draw_name = get_file_or_folder_name(svg_file)
     print draw_name
     svg_path = read_path_from_svg_file(svg_file)
+    if INKSCAPE_SVG_FILE_TEMPLATE:
+        with open(svg_file, "wb") as f:
+            f.write(INKSCAPE_SVG_FILE_TEMPLATE % (svg_path,))
+        return ""
     path_commands = parse_svg_path_to_commands(svg_path)
     draw_data = parse_path_commands_to_draw_data(path_commands) + "E"
     c_array = parse_draw_data_to_c_array(draw_name, draw_data)
@@ -229,6 +266,7 @@ def main(arguments):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
+        prog=get_file_or_folder_name(__file__),
         description="convert svg file(s) to arduino draw arrays h file")
     parser.add_argument(
         "-i",
@@ -244,6 +282,12 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="the output h file path (default is the image input path)")
+    parser.add_argument(
+        "-c",
+        "--convert",
+        action="store_true",
+        dest="convert_to_inkscape_svg",
+        help="convert the svg file to inkscape svg")
     args = parser.parse_args()
 
     args.input_path = os.path.abspath(args.input_path)
@@ -258,4 +302,7 @@ if __name__ == "__main__":
     else:
         print "the input is not a valid file or directory"
         exit(1)
+
+    if not args.convert_to_inkscape_svg:
+        INKSCAPE_SVG_FILE_TEMPLATE = ""
     main(args)
