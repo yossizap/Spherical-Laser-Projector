@@ -1,5 +1,5 @@
-#include <math.h>
-#include "gen/new.h"
+// #include <math.h>
+#include "gen/svgs.h"
 
 
 #define X_AXIS_LIMIT_MIN			(-1200)
@@ -76,6 +76,8 @@ void set_lasers(uint8_t mask) {
 /* turn laser on or off (pull npn base up to turn the laser on) */
 void set_laser(bool is_on) {
 	set_lasers(is_on ? LASER_BLUE_MASK : 0);
+	Serial.print(F("set laser: "));
+	Serial.println(is_on);
 }
 
 /* sets the motors positions to match "current_position" global
@@ -161,9 +163,7 @@ void go_to(int16_t x, int16_t y) {
 
 void draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
 	go_to(x0, y0);
-	set_laser(true);
 	go_to(x1, y1);
-	set_laser(false);
 }
 
 void draw_arc(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t arc, int16_t sweep, int16_t x1, int16_t y1) {
@@ -172,7 +172,6 @@ void draw_arc(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t 
 
 void draw_quadratic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
 	go_to(x0, y0);
-	set_laser(true);
 	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; i++) {
 		double t = (double)i / (double)BEZIER_SEGMENTS;
 		double a = pow((1.0 - t), 2.0);
@@ -182,12 +181,10 @@ void draw_quadratic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16
 		double y = a * y0 + b * y1 + c * y2;
 		go_to(x, y);
 	}
-	set_laser(false);
 }
 
 void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3) {
 	go_to(x0, y0);
-	set_laser(true);
 	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; i++) {
 		double t = (double)i / (double)BEZIER_SEGMENTS;
 		double a = pow((1.0 - t), 3.0);
@@ -198,7 +195,6 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 		double y = a * y0 + b * y1 + c * y2 + d * y3;
 		go_to(x, y);
 	}
-	set_laser(false);
 }
 
 void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
@@ -224,11 +220,14 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 		}
 		if (i == sizeof(PATH_COMMAND_ARGUMENTS)) {
 			Serial.println(F("bad command!"));
-			return;
+			goto finally;
 		}
 		arguments_count *= sizeof(*arguments);
 		memcpy_P(arguments, path, arguments_count);
 		path += arguments_count;
+
+		// if (command != 'M')
+			// set_laser(true);
 
 		switch (command) {
 			case 'M':
@@ -238,25 +237,22 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 				current_x = start_x;
 				current_y = start_y;
 				go_to(current_x, current_y);
+				set_laser(true);
 			break;
 			case 'H':
-				set_laser(true);
 				go_to(arguments[0], current_y);
 				current_x = arguments[0];
 			break;
 			case 'V':
-				set_laser(true);
 				go_to(current_x, arguments[0]);
 				current_y = arguments[0];
 			break;
 			case 'L':
-				set_laser(true);
 				go_to(arguments[0], arguments[1]);
 				current_x = arguments[0];
 				current_y = arguments[1];
 			break;
 			case 'Z':
-				set_laser(true);
 				go_to(start_x, start_y);
 				current_x = start_x;
 				current_y = start_y;
@@ -291,16 +287,17 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale) {
 			break;
 			case 'A':
 				//TODO: implement arc!
-				set_laser(true);
 				go_to(arguments[3], arguments[4]);
 			break;
 			case 'E':
-				set_laser(false);
 				Serial.println(F("path end!"));
-				return;
+				goto finally;
 			break;
 		}
 	}
+	
+finally:
+	set_laser(false);
 }
 
 /* called once at power-on */
@@ -317,10 +314,9 @@ void setup() {
 	// set_laser(true); delay(100); set_laser(false);
 
 
-
-	draw_path(BUTTERFLY_1_DRAW, -400, -300, 1.0);
-	/*draw_path(ANDROID_1_DRAW, -400, -300, 1.0);
+	draw_path(ANDROID_1_DRAW, -400, -300, 1.0);
 	draw_path(EAGLE_1_DRAW, -400, -300, 1.0);
+	/*draw_path(BUTTERFLY_1_DRAW, -400, -300, 1.0);
 	draw_path(FLOWER_1_DRAW, -400, -300, 1.0);
 	draw_path(LAMP_1_DRAW, -400, -300, 1.0);
 	draw_path(SOL_KEY_1_DRAW, -400, -300, 1.0);
