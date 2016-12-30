@@ -44,7 +44,7 @@
 #define BEZIER_SEGMENTS				(30)
 // #define STEPS_PER_RADIAN			(648.68)
 // #define Z_SQARE						(10000) // 19700
-#define LAMP_FADE_MS				(150)
+#define LAMP_FADE_MS				(50)
 #define EEPROM_RECORD_ADDRESS		(0)
 #define EEPROM_STATUS_VALID			(0x55)
 // #define EEPROM_STATUS_INVALID		(0xAA)
@@ -101,26 +101,26 @@ typedef struct draw_image_t {
 };
 
 const draw_image_t draws[] = {
-	{ANDROID_1_DRAW, -400, -300, 1.0},
-	{EAGLE_1_DRAW, -400, -300, 1.0},
-	{BUTTERFLY_1_DRAW, -400, -300, 1.0},
-	{FLOWER_1_DRAW, -400, -300, 1.0},
-	{APPLE_1_DRAW, -400, -300, 1.0},
-	{BALL_1_DRAW, -400, -300, 1.0},
-	{BICYCLE_1_DRAW, -400, -300, 1.0},
-	{BRAIN_1_DRAW, -400, -300, 1.0},
-	{CHESS_1_DRAW, -400, -300, 1.0},
-	{HAND_1_DRAW, -400, -300, 1.0},
-	{MENORAH_1_DRAW, -400, -300, 1.0},
-	{MUSEUM_LOGO_1_DRAW, -400, -300, 1.0},
-	{MUSEUM_LOGO_2_DRAW, -400, -300, 1.0},
-	{MUSEUM_LOGO_3_DRAW, -400, -300, 1.0},
-	{PATTERN_1_DRAW, -400, -300, 1.0},
-	{PRESENT_1_DRAW, -400, -300, 1.0},
-	{RECYCLE_1_DRAW, -400, -300, 1.0},
-	{TEXT_1_DRAW, -400, -300, 1.0},
-	{TRISKELITON_1_DRAW, -400, -300, 1.0},
-	{YIN_YANG_1_DRAW, -400, -300, 1.0},
+	{MUSEUM_LOGO_1_DRAW, 0, 0, 1.1},
+	{MUSEUM_LOGO_2_DRAW, 440, 0, 1.1},
+	{MUSEUM_LOGO_3_DRAW, 220, 330, 1.1},
+	{ANDROID_1_DRAW, 0, 0, 1.1},
+	{EAGLE_1_DRAW, 0, 0, 1.1},
+	{BUTTERFLY_1_DRAW, 0, 0, 1.1},
+	{FLOWER_1_DRAW, 0, 0, 1.2},
+	{APPLE_1_DRAW, 0, 0, 1.1},
+	{BALL_1_DRAW, 0, 0, 1},
+	{BICYCLE_1_DRAW, 0, 0, 1},
+	{BRAIN_1_DRAW, 0, 0, 1.1},
+	{CHESS_1_DRAW, 0, 0, 1.1},
+	// {HAND_1_DRAW, 0, 0, 1.1},
+	{MENORAH_1_DRAW, 0, 0, 1.1},
+	{PATTERN_1_DRAW, 0, 0, 1.2},
+	{PRESENT_1_DRAW, 0, 0, 0.9},
+	{RECYCLE_1_DRAW, 0, 0, 1.1},
+	{TEXT_1_DRAW, 0, 0, 1.1},
+	{TRISKELITON_1_DRAW, 0, 0, 1.1},
+	{YIN_YANG_1_DRAW, 0, 0, 1.1},
 };
 
 int16_t current_position_x = 0;
@@ -183,17 +183,19 @@ void test_power() {
 }
 
 void busy_delay(uint32_t ms) {
-	lamp_fade_ms += ms;
 	ms += millis();
-	if (lamp_fade_ms > LAMP_FADE_MS) {
-		lamp_fade_ms = 0;
+	do {
+		test_power();
+	} while (millis() < ms);
+}
+
+void lamp_fade() {
+	if ((millis() - lamp_fade_ms) > LAMP_FADE_MS) {
+		lamp_fade_ms = millis();
 		if (++lamp_fade_index >= sizeof(LAMP_FADE_PWM))
 			lamp_fade_index = 0;
 		set_lamp(LAMP_FADE_PWM[lamp_fade_index]);
 	}
-	do {
-		test_power();
-	} while (millis() < ms);
 }
 
 /* sets the motors positions to match "current_position" global
@@ -440,6 +442,9 @@ void setup() {
 	set_laser(false);
 	set_lamp(255);
 	delay(1000);
+    
+    /* Uncomment to adjust the projector's starting position on reset */
+	//relative_steps(10, 0); set_home(); while(true);
 
 	EEPROM.get(EEPROM_RECORD_ADDRESS, eeprom_record);
 	switch (eeprom_record.status) {
@@ -460,22 +465,18 @@ void setup() {
 			write_current_position_to_eeprom();
 		break;
 	}
-	
-	/* Move to the first path's starting coordinates */
-	draw_next_path(0, true);
-
-	//relative_steps(+40, 0); set_home();
-	// set_laser(true); delay(100); set_laser(false);
 }
 
 /* called repeatedly after "setup" */
 void loop() {
 	static uint8_t index = 0;
 	bool is_last_point = false;
-	set_lamp(0);
     
-	while(PINB & BUTTON_MASK);
-	
+	while(PINB & BUTTON_MASK) {
+		lamp_fade();
+	}
+	set_lamp(0);
+
 	draw_next_path(index, false);
 	++index;
 	if (draw_next_path(index, true)) {
@@ -484,8 +485,6 @@ void loop() {
 	}
 
 	write_current_position_to_eeprom();
-	set_lamp(255);
-	// go_home();
 	delay(1000);
 	while(!(PINB & BUTTON_MASK));
 }
