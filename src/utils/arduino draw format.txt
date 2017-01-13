@@ -1,24 +1,24 @@
 Arduino Draw Format 1.0:
 
-Represents a draw using binary graphic command(s).
-Each command is 8 bits, follow by optional little-endian 16 bits arguments,
-Some commands have 8 bits point-count extention.
-All points are absolute from 0,0 - left top of draw.
+Represents a drawing using a binary graphic command(s).
+Each command is 8 bits, followed by optional little-endian 16 bits arguments,
+Some commands have an 8 bits point-count extension.
+All points are absolute from 0,0 - top left corner of the drawing.
 
 command + [arguments...]
-	0										= "draw end" end of draw, last command
-	1										= "draw close" go to start, last command
-	2	x									= "draw horizontal line" go to (x,y0)
-	3	y									= "draw vertical line" go to (x0,y)
-	4	x0,y0								= "draw start" go to (x0,y0)
-	5	x0,y0								= "draw restart" go to start, and start from (x0,y0)
-	6	x,y									= "draw line" from (x0,y0) to (x,y)
-	7	n,...,xn,yn							= "draw lines" from (x0,y0) to (xn,yn)
-	8	xa,ya,x,y							= "draw quadratic bezier" curve from (x0,y0) to (x,y)
-	9	n,xa,ya,x,y,...,xan,yan				= "draw quadratic beziers" curves from (x0,y0) to (xan,yan)
-	10	xa,ya,xb,yb,x,y						= "draw cubic bezier" curve from (x0,y0) to (x,y)
-	11 	n,xa,ya,xb,yb,x,y,xan,yan,xbn,ybn	= "draw cubic beziers" curves from (x0,y0) to (xbn,ybn)
-	12 	xr,yr,r,x,y							= "draw elliptic" curves from (x0,y0) to (x,y)
+	0										= "drawing end" - end of drawing, last command
+	1										= "drawing close" go to start, last command
+	2	x									= "drawing horizontal line" go to (x,y0)
+	3	y									= "drawing vertical line" go to (x0,y)
+	4	x0,y0								= "drawing start" go to (x0,y0)
+	5	x0,y0								= "drawing restart" go to start, and start from (x0,y0)
+	6	x,y									= "drawing line" from (x0,y0) to (x,y)
+	7	n,...,xn,yn							= "drawing lines" from (x0,y0) to (xn,yn)
+	8	xa,ya,x,y							= "drawing quadratic bezier" curve from (x0,y0) to (x,y)
+	9	n,xa,ya,x,y,...,xan,yan				= "drawing quadratic beziers" curves from (x0,y0) to (xan,yan)
+	10	xa,ya,xb,yb,x,y						= "drawing cubic bezier" curve from (x0,y0) to (x,y)
+	11 	n,xa,ya,xb,yb,x,y,xan,yan,xbn,ybn	= "drawing cubic beziers" curves from (x0,y0) to (xbn,ybn)
+	12 	xr,yr,r,x,y							= "drawing elliptic" curves from (x0,y0) to (x,y)
 												((r & 0x01FF) % 360) is the x-axis-rotation
 												r & 0x0200 is the large-arc-flag
 												r & 0x0400 is the sweep-flag
