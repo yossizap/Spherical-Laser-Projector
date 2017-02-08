@@ -484,6 +484,54 @@ bool draw_next_path(uint8_t index, bool only_start_point) {
 	return false;
 }
 
+void manual_mode() {
+	char buffer[SERIAL_BUFFER_SIZE] = {0};
+	char text[SERIAL_BUFFER_SIZE] = {0};
+	char * ptr = buffer + 2;
+	int16_t i, x, y;
+	
+	while (true) {
+		uint8_t len = Serial.readBytesUntil('\n', buffer, SERIAL_BUFFER_SIZE - 1);
+		if (0 == len) return;
+		buffer[len] = 0;
+		Serial.flush();
+	
+		switch (buffer[0]) {
+			case '?':
+				Serial.println(F(
+					"Enter command:\n"
+					"set home:            h\n"
+					"set laser (ie: l 1): l <is_on>\n"
+					"go (ie: g 10 10):    g <x> <y>\n"
+					"draw (ie: d 2):      d <index>\n"
+					"print this help:     ?\n"
+				));
+			break;
+			case 'h':
+				set_home();
+				Serial.println(F("Home"));
+			break;
+			case 'l':
+				sscanf(ptr, "%d", &i);
+				set_laser(i);
+			break;
+			case 'g':
+				x = y = 0;
+				sscanf(ptr, "%d %d", &x, &y);
+				Serial.print(F("Go: ("));
+				Serial.print(x);
+				Serial.print(F(", "));
+				Serial.print(y);
+				Serial.print(F(")\n"));
+				relative_steps(x, y);
+			case 'd':
+				sscanf(ptr, "%d", &i);
+				draw_next_path(i, false);
+			break;
+		}
+	}
+}
+
 /* called once at power-on */
 void setup() {
 	eeprom_record_t eeprom_record;
@@ -498,9 +546,16 @@ void setup() {
 	set_laser(false);
     
     /* Turn the lamp on to indicate that the setup is done */
-	set_lamp(255);
-	delay(1000);
-    
+	set_lamp(255); delay(1000);
+	
+	/* Manual mode (never returns) if the button is pressed for 3 seconds at startup */
+	for (uint8_t i = 0; !(PINB & BUTTON_MASK); i++) {
+		set_lamp(0); delay(500);
+		set_lamp(255); delay(500);
+		if (i > 2)
+			manual_mode();
+	}
+
     /* Uncomment to adjust the projector's starting position on reset(used for calibration) */
 	//relative_steps(10, 0); set_home(); while(true);
 
@@ -512,7 +567,6 @@ void setup() {
 			print_point(eeprom_record.x, eeprom_record.y);
 			g_current_position_x = eeprom_record.x;
 			g_current_position_y = eeprom_record.y;
-            
 			go_home();
 			write_current_position_to_eeprom();
 		break;
@@ -531,12 +585,11 @@ void loop() {
 	static uint8_t index = 0;
     
 	/* Wait for a button press, turn on the LED's flickering meanwhile */
-	while(PINB & BUTTON_MASK) {
-        lamp_fade()
-    }
+	while(PINB & BUTTON_MASK)
+        lamp_fade();
     
     /* Turn the lamp off to indicate that the drawing has started */
-    set_lamp(0)
+    set_lamp(0);
     
 	/* Draw the path and increment the drawing's index */
 	draw_next_path(index++, false);
@@ -550,3 +603,42 @@ void loop() {
 	/* Wait for a button release */
 	while(!(PINB & BUTTON_MASK));
 }
+
+/*
+משולשים ישרי זווית - כמו מסור
+void draw_razor(uint16_t len, uint8_t max_segments, uint8_t max_height)
+{
+    uint8_t segments = rand() % max_segments;
+    uint8_t start_y = g_starting_y;
+    for(uint16_t i = 0; i < segments; ++i)
+    {
+        draw_line(sqrt(pow(len/segments)/2), rand() % max_height);
+        draw_line(0, start_y);
+    }
+}
+ 
+הרבה משולשים שווי צלעות - כמו דשא
+void draw_grass(uint16_t len, uint8_t max_segments, uint8_t max_height)
+{
+    uint8_t segments = rand() % max_segments;
+    uint8_t start_y = g_starting_y;
+    for(uint16_t i = 0; i < segments; ++i)
+    {
+        draw_line((len/segments)/2, rand() % max_height);
+        draw_line((len/segments)/2, start_y);
+    }
+}
+ 
+מוניטור לב
+void draw_heartmonitor(uint16_t len, uint8_t max_segments, uint8_t max_height)
+{
+    uint8_t segments = rand() % max_segments;
+    uint8_t start_y = g_starting_y;
+    for(uint16_t i = 0; i < segments; ++i)
+    {
+        ratio = rand() % 10;
+        draw_line((len/segments)/ratio, rand() % max_height);
+        draw_line((len/segments) - ratio, start_y);
+    }
+}
+*/
