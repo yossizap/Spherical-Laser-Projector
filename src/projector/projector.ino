@@ -1,59 +1,60 @@
 /*********************************** LICENCE **********************************\
-| Laser Projector - arduino based blue laser projector software.               |
+| Spherical Laser Projector - arduino based blue laser projector software.     |
 |                                                                              |
 | Hardware:                                                                    |
 |     * Two uno-polar step motors for X and Y axes,                            |
 |       connected via NPNs to pins 4-7 and A0-A3.                              |
-|     * Blue laser and fan, connected via MOSFATS to pins 8,9.                 |
+|     * Blue laser connected via NPN to pins 8.                                |
+|     * Normally open button connected via GND and pin 12.                     |
+|     * LED inside the button connected to GND and pin 11 via 1K resistor.     |
+|     * Input Powrer goes to pin 13, and to arduino 5V via diod with capacitor.|
 |                                                                              |
-| Functions:                                                                   |
-|     * relative/absolute steps/point (x, y)                                   |
-|     * set lasers mask (lasers mask)                                          |
-|     * set speed (speed)                                                      |
-|     * set distance (distance)                                                |
-|     * set home                                                               |
-|     * draw polygon (x, y, cornners, [size, start angle])                     |
-|     * draw text (x, y, text, [size])                                         |
+| Software:                                                                    |
+|     * Draws formated paths of SVG path commands.                             |
+|     * Saves and restors motors positions from EEPROM.                        |
+|     * Goes to next draw starting point for the best UI experience.           |
 |                                                                              |
-| Protocol:                                                                    |
-|     * use textual single line protocol ending with \n and binary protocol!   |
-|     * binary starts with barker and then like textual...                     |
-|     * max length 60 bytes                                                    |
-|     * text: no spaces - for two words need two commands                      |
-|     * listen for serial in loop,                                             |
-|     * when full command recived - execut                                     |
-|     * while executing, check buffer size, if not 0, return                   |
-|                                                                              |
-| By A.E.TEC (Arad Eizen) 2016.                                                |
+| Arad Eizen and Yossi Zapesochini 2016.                                       |
 |	                                                                           |
 \******************************************************************************/
+// #define USE_OLD_PROJECTOR_PINOUTS
+
+
 // #include <math.h>
 #include <EEPROM.h>
 #include "gen/svgs.h"
 
-
-#define CORNER_DEG					(1010)
-#define X_AXIS_LIMIT_MIN			(-CORNER_DEG)
-#define Y_AXIS_LIMIT_MIN			(-2400)
-#define X_AXIS_LIMIT_MAX			(CORNER_DEG * 2)
-#define Y_AXIS_LIMIT_MAX			(2400)
-
+#ifdef USE_OLD_PROJECTOR_PINOUTS
+	#define X_AXIS_LIMIT_MIN		(-1200)
+	#define Y_AXIS_LIMIT_MIN		(-800)
+	#define X_AXIS_LIMIT_MAX		(1200)
+	#define Y_AXIS_LIMIT_MAX		(600)
+#else
+	#define CORNER_DEG				(1010)
+	#define X_AXIS_LIMIT_MIN		(-CORNER_DEG)
+	#define Y_AXIS_LIMIT_MIN		(-2400)
+	#define X_AXIS_LIMIT_MAX		(CORNER_DEG * 2)
+	#define Y_AXIS_LIMIT_MAX		(2400)
+#endif
 #define SERIAL_BAUDRATE				(115200)
 #define SERIAL_BUFFER_SIZE			(60)
 #define STEPS_DELAY_MS				(4)
 #define BEZIER_SEGMENTS				(30)
-// #define STEPS_PER_RADIAN			(648.68)
-// #define Z_SQARE						(10000) // 19700
+
 #define LAMP_FADE_MS				(150)
 #define EEPROM_RECORD_ADDRESS		(0)
 #define EEPROM_STATUS_VALID			(0x55)
-// #define EEPROM_STATUS_INVALID		(0xAA)
 
 #define X_AXIS_A_PIN				(4)
 #define X_AXIS_B_PIN				(5)
 #define X_AXIS_C_PIN				(6)
 #define X_AXIS_D_PIN				(7)
-#define LASER_PIN					(8)
+#ifdef USE_OLD_PROJECTOR_PINOUTS
+	#define LASER_RED_PIN			(8)
+	#define LASER_BLUE_PIN			(9)
+#else
+	#define LASER_PIN				(8)
+#endif
 #define LIGHT_PIN					(11)
 #define BUTTON_PIN					(12)
 #define POWER_PIN					(13)
@@ -63,16 +64,20 @@
 #define Y_AXIS_D_PIN				(A3)
 
 #define _PINB_MASK(pin)				(1 << (pin - 8))
-#define LASER_MASK					(_PINB_MASK(LASER_PIN))
+#ifdef USE_OLD_PROJECTOR_PINOUTS
+	#define LASER_BLUE_MASK			(_PINB_MASK(LASER_BLUE_PIN))
+	#define LASER_RED_MASK			(_PINB_MASK(LASER_RED_PIN))
+	#define LASERS_MASK				(LASER_BLUE_MASK | LASER_RED_MASK)
+#else
+	#define LASER_MASK				(_PINB_MASK(LASER_PIN))
+#endif
 #define LIGHT_MASK					(_PINB_MASK(LIGHT_PIN))
 #define BUTTON_MASK					(_PINB_MASK(BUTTON_PIN))
 #define POWER_MASK					(_PINB_MASK(POWER_PIN))
 
 
-// const uint8_t STEPS_MASKS[] = {0b0001, 0b0011, 0b0010, 0b0110, 0b0100, 0b1100, 0b1000, 0b1001};
 const uint8_t STEPS_MASKS[] = {0b1001, 0b1000, 0b1100, 0b0100, 0b0110, 0b0010, 0b0011, 0b0001};
 const uint8_t LAMP_FADE_PWM[] = {5, 10, 20, 40, 80, 130, 180, 220, 255, 200, 100, 40, 10};
-// const uint8_t PATH_COMMAND_ARGUMENTS[] = {2,1,1,2,0,4,2,6,4,7,2,1,1,2,0,4,2,6,4,7,0};
 const uint8_t PATH_COMMAND_ARGUMENTS[] = {
 	'M', 2,
 	'H', 1,
@@ -125,9 +130,6 @@ const draw_image_t draws[] = {
 
 int16_t current_position_x = 0;
 int16_t current_position_y = 0;
-// uint8_t steps_delay_ms = STEPS_DELAY_MS;
-// bool text_right_diraction = false;
-// uint8_t text_char_sep = 10;
 int16_t draw_x = 0;
 int16_t draw_y = 0;
 double draw_scale = 2.0;
@@ -136,6 +138,7 @@ uint8_t lamp_fade_index = 0;
 uint32_t lamp_fade_ms = 0;
 
 
+/* logs prints the given position as point */
 void print_point(int16_t x, int16_t y) {
 	Serial.print('(');
 	Serial.print(x);
@@ -144,10 +147,26 @@ void print_point(int16_t x, int16_t y) {
 	Serial.println(')');
 }
 
+/* set the button LED to the given brightness */
 void set_lamp(uint8_t brightness) {
 	analogWrite(LIGHT_PIN, brightness);
 }
 
+#ifdef USE_OLD_PROJECTOR_PINOUTS
+/* turn lasers on or off (pull mosfets sorce down to turn the laser on) */
+void set_lasers(uint8_t mask) {
+	mask &= LASERS_MASK;
+	DDRB &= ~LASERS_MASK ^ mask;
+	DDRB |= mask;
+}
+
+/* turn blue laser on or off */
+void set_laser(bool is_on) {
+	set_lasers(is_on ? LASER_BLUE_MASK : 0);
+	Serial.print(F("set laser: "));
+	Serial.println(is_on);
+}
+#else
 /* turn laser on or off (pull npn base up to turn the laser on) */
 void set_laser(bool is_on) {
 	if (is_on)
@@ -155,7 +174,9 @@ void set_laser(bool is_on) {
 	else
 		PORTB &= ~LASER_MASK;
 }
+#endif
 
+/* writes current motors position to the eeprom and log */
 void write_current_position_to_eeprom() {
 	eeprom_record_t eeprom_record;
 	// EEPROM.write(EEPROM_RECORD_ADDRESS, EEPROM_STATUS_INVALID);
@@ -167,6 +188,7 @@ void write_current_position_to_eeprom() {
 	EEPROM.put(EEPROM_RECORD_ADDRESS, eeprom_record);
 }
 
+/* the position save macanisem- must be called repeatedly */
 void test_power() {
 	if (!(PINB & POWER_MASK)) {
 		set_lamp(0);
@@ -182,6 +204,7 @@ void test_power() {
 	}
 }
 
+/* delay that keeps the button LED fade and position safe */
 void busy_delay(uint32_t ms) {
 	lamp_fade_ms += ms;
 	ms += millis();
@@ -250,7 +273,7 @@ bool absolute_steps(int16_t x, int16_t y) {
 	return false;
 }
 
-/* set the current laser position to (0, 0) for trigo to work */
+/* set the current laser position to (0, 0) */
 void set_home() {
 	current_position_x = 0;
 	current_position_y = 0;
@@ -265,6 +288,7 @@ void go_home() {
 	absolute_steps(0, 0);
 }
 
+/* moves motors to the given position */
 void go_to(int16_t x, int16_t y) {
 	if (absolute_steps(round(x * draw_scale) + draw_x, round(y * draw_scale) + draw_y)) {
 		Serial.println(F("point out of range!"));
@@ -272,15 +296,18 @@ void go_to(int16_t x, int16_t y) {
 	}
 }
 
+/* moves motors in linear path */
 void draw_line(int16_t x0, int16_t y0, int16_t x1, int16_t y1) {
 	go_to(x0, y0);
 	go_to(x1, y1);
 }
 
+/* moves motors in arc path */
 void draw_arc(int16_t x0, int16_t y0, int16_t radius, int16_t rotation, int16_t arc, int16_t sweep, int16_t x1, int16_t y1) {
 	// TODO
 }
 
+/* moves motors in bezier path */
 void draw_quadratic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
 	go_to(x0, y0);
 	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; i++) {
@@ -294,6 +321,7 @@ void draw_quadratic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16
 	}
 }
 
+/* moves motors in bezier path */
 void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3) {
 	go_to(x0, y0);
 	for (uint8_t i = 0; i <= BEZIER_SEGMENTS; i++) {
@@ -308,11 +336,12 @@ void draw_cubic_bezier(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x
 	}
 }
 
-/* default positions for the drawings. */
+/* default positions for the drawings */
 #define DEFAULT_X_POS (-100)
 #define DEFAULT_Y_POS (600)
 #define DEFAULT_SCALE (1.0)
 
+/* draw the given draw from PROGMEM in the given x, y, and scale */
 void draw_path(PGM_P path, int16_t x, int16_t y, double scale, bool only_start_point) {
 	uint8_t i;
 	uint8_t command;
@@ -341,9 +370,6 @@ void draw_path(PGM_P path, int16_t x, int16_t y, double scale, bool only_start_p
 		arguments_count *= sizeof(*arguments);
 		memcpy_P(arguments, path, arguments_count);
 		path += arguments_count;
-
-		// if (command != 'M')
-			// set_laser(true);
 
 		switch (command) {
 			case 'M':
@@ -418,6 +444,7 @@ finally:
 	set_laser(false);
 }
 
+/* draw the path at the given index from the global "draws" array */
 bool draw_next_path(uint8_t index, bool only_start_point) {
 	if (index >= (sizeof(draws) / sizeof(*draws)))
 		return true;
@@ -438,9 +465,10 @@ void setup() {
 	pinMode(BUTTON_PIN, INPUT_PULLUP);
 
 	set_laser(false);
-	set_lamp(255);
-	delay(1000);
+	/* set lamp on to indicate code started */
+	set_lamp(255); delay(1000);
 
+	/* calibrate position if needed */
 	EEPROM.get(EEPROM_RECORD_ADDRESS, eeprom_record);
 	switch (eeprom_record.status) {
 		case EEPROM_STATUS_VALID:
@@ -451,10 +479,6 @@ void setup() {
 			go_home();
 			write_current_position_to_eeprom();
 		break;
-/*		case EEPROM_STATUS_INVALID:
-			Serial.println(F("invalid eeprom record, must be fixed by IDE!"));
-			while (true);
-		break;*/
 		default:
 			Serial.println(F("first time eeprom read!"));
 			write_current_position_to_eeprom();
@@ -464,132 +488,25 @@ void setup() {
 	/* Move to the first path's starting coordinates */
 	draw_next_path(0, true);
 
-	//relative_steps(+40, 0); set_home();
-	// set_laser(true); delay(100); set_laser(false);
+	/* uncommant for calibration */
+	// relative_steps(40, 0); set_home();
 }
 
 /* called repeatedly after "setup" */
 void loop() {
 	static uint8_t index = 0;
-	bool is_last_point = false;
-	set_lamp(0);
-    
-	while(PINB & BUTTON_MASK);
-	
-	draw_next_path(index, false);
-	++index;
-	if (draw_next_path(index, true)) {
-		index = 0;
-		draw_next_path(index, true);
-	}
 
+	set_lamp(0);
+	/* wait for button press */
+	while(PINB & BUTTON_MASK);
+	/* draw path and increment index */
+	draw_next_path(index++, false);
+	/* go to next draw starting point */
+	while (draw_next_path(index, true)) index = 0;
+	/* save current position so arduino can be reprogramed/reset without re-calibrating */
 	write_current_position_to_eeprom();
-	set_lamp(255);
-	// go_home();
-	delay(1000);
+	/* set lamp on to indicate movement completed */
+	set_lamp(255); delay(1000);
+	/* wait for button release */
 	while(!(PINB & BUTTON_MASK));
 }
-
-/* draw regular polygon x, y are the center point with absolute_steps */
-/*void draw_polygon(xy_point * p, uint8_t corners, int16_t size, int16_t start_angle) {
-	xy_point tmp;
-	double current_angle = PI * start_angle / 180.0;
-	double step_angle = PI * 2.0 / corners;
-	corners++;
-	set_laser(true);
-	while (corners) {
-		tmp.x = x + round(size * cos(current_angle));
-		tmp.y = y + round(size * sin(current_angle));
-		absolute_steps(&tmp);
-		current_angle += step_angle;
-		corners--;
-	}
-	set_laser(false);
-	disable_axes();
-}*/
-
-/*void get_path_size(char * path, xy_point * p) {
-	
-}*/
-
-/*void get_text_size(char * text, xy_point * p) {
-	xy_point tmp;
-	x = (*text ? -text_char_sep : 0);
-	y = 0;
-	while (*text) {
-		get_path_size(char_to_path(*text++), &tmp);
-		x += tmx + text_char_sep;
-		if (y < tmy)
-			y = tmy;
-	}
-}*/
-
-/*void draw_path(char * path, xy_point * p) {
-	
-}*/
-
-/* draw a NULL terminated string */
-/*void draw_text(char * text, xy_point * p) {
-	xy_point tmp;
-	
-	if (text_right_diraction) {
-		get_text_size(text, &tmp);
-	}
-	
-	draw_path
-	while (*text)
-		x += draw_char(x, y, *text++, scale) + 1;
-}*/
-
-/*
-void draw_start(int16_t x0, int16_t y0) {
-	go_to(x0, y0);
-	draw_last_x = x0;
-	draw_last_y = y0;
-}
-
-void draw_line(int16_t x1, int16_t y1) {
-	draw_line(draw_last_x, draw_last_y, x1, y1);
-	draw_last_x = x1;
-	draw_last_y = y1;
-}
-
-void draw_quadratic_bezier(int16_t x1, int16_t y1, int16_t x2, int16_t y2) {
-	draw_quadratic_bezier(draw_last_x, draw_last_y,  x1,  y1,  x2,  y2);
-	draw_last_x = x2;
-	draw_last_y = y2;
-}
-
-void draw_cubic_bezier(int16_t x1, int16_t y1, int16_t x2, int16_t y2, int16_t x3, int16_t y3) {
-	draw_cubic_bezier(draw_last_x, draw_last_y,  x1,  y1,  x2,  y2,  x3,  y3);
-	draw_last_x = x3;
-	draw_last_y = y3;
-}
-*/
-
-/*void test() {
-	for (uint16_t i = 0; i < 1010*2; i++)
-		relative_steps(1, 0);
-	delay(3000);
-	go_home();
-	for (uint16_t i = 0; i < 1010; i++)
-		relative_steps(-1, 0);
-	delay(3000);
-	go_home();
-
-	for (uint16_t i = 0; i < 1700; i++)
-		relative_steps(0, 1);
-	delay(3000);
-	go_home();
-	for (uint16_t i = 0; i < 1700; i++)
-		relative_steps(0, -1);
-	delay(3000);
-	go_home();
-}*/
-
-/* convert absolute point to absolute axes steps */
-/*void absolute_point(int32_t x, int32_t y) {
-	double n = sqrt(x * x + y * y + Z_SQARE);
-	double a = asin(y / n);
-	absolute_steps(round(STEPS_PER_RADIAN * asin(x / n / cos(a))), round(STEPS_PER_RADIAN * a));
-}*/
